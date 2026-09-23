@@ -1,0 +1,21 @@
+version: 1
+project:
+  title: Energy Insights
+  authors:
+    - name: cgroll
+  copyright: '2026'
+  exclude:
+    - _build
+    - Thumbs.db
+    - .DS_Store
+    - '**.ipynb_checkpoints'
+  github: cgroll/energy-insights
+  toc:
+    - file: markdown/index.md
+    - title: MaStR capacity
+      children:
+        - file: notebooks/01_mastr_capacity_de.ipynb
+site:
+  options:
+    folders: true
+  template: book-theme
