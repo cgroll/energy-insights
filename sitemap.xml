@@ -7,4 +7,7 @@
   <url>
     <loc>http://localhost:3000/notebooks/mastr-capacity-de</loc>
   </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/mastr-vs-smard-capacity</loc>
+  </url>
 </urlset>
