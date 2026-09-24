@@ -20,7 +20,6 @@ project:
     - title: PECD potential validation
       children:
         - file: notebooks/04_pecd_potential_vs_smard_observed.ipynb
-        - file: notebooks/05_pecd_wind_country_level_check.ipynb
         - file: notebooks/06_pecd_simple_vs_mastr_weighted.ipynb
 site:
   options:

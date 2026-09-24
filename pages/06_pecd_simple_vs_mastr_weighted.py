@@ -47,8 +47,8 @@
 #
 # **Wind onshore/offshore** -- PECD has no `nuts_0` product for wind at all
 # (confirmed against the live CDS API, see
-# `pecd_wind_onshore_country_capacity_factor`'s own docstring), only
-# zone-level (`PEON`/`PEOF`). The simple approximation here: weight each
+# `energy-data-hub/docs/pecd_data_availability.md`), only zone-level
+# (`PEON`/`PEOF`). The simple approximation here: weight each
 # zone by its physical area (from PECD's own rasterized zone mask, the same
 # file `edh.region_geo.fractional_zone_weights` uses for MaStR unit
 # assignment), not by installed capacity -- i.e. assume turbines are spread
@@ -230,10 +230,9 @@ plt.show()
 #   data barely moves the national aggregate.
 # - **Wind onshore is decent but not much better than doing nothing clever**:
 #   correlation ~0.975, bias ~+0.3 percentage points -- close to, not
-#   meaningfully better than, the already-existing naive equal-zone mean
-#   (`pecd_wind_onshore_country_capacity_factor`). Germany's 7 PEON zones
-#   don't differ enough in area for area-weighting to add much over equal
-#   weighting.
+#   meaningfully better than, a plain unweighted mean across zones would be.
+#   Germany's 7 PEON zones don't differ enough in area for area-weighting to
+#   add much over equal weighting.
 # - **Wind offshore matches well once the all-NaN zones are handled
 #   correctly**: correlation ~0.977, bias ~+1 percentage point. The first
 #   attempt at this (not shown) got a ~20% *relative* bias by summing

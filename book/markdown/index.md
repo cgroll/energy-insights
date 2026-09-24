@@ -33,10 +33,6 @@ reviewed against the new numbers.
 - **PECD potential validation** — how far PECD-derived renewable potential
   sits from what SMARD reports Germany actually produced, and whether that
   gap looks like curtailment/self-consumption rather than a modeling error.
-- **PECD country-level check: onshore wind** — PECD doesn't publish a
-  country-level capacity factor for wind, only solar; this replicates its
-  own method from the zone data the hub already holds and checks it
-  against this hub's MaStR-weighted DE series.
 - **DE capacity factors: simple approximation vs. MaStR-weighted** — how far
   a MaStR-free approximation (fixed public technology-mix weights for solar,
   area-weighted PECD zones for wind) gets against the real MaStR-weighted
