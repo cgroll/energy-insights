@@ -87,4 +87,21 @@ def page_mastr_vs_smard_capacity(context: AssetExecutionContext) -> None:
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
-page_assets = [page_mastr_capacity_de, page_mastr_vs_smard_capacity]
+@asset(
+    name="page_pv_categories",
+    deps=["mastr_capacity_events", "mastr_capacity_by_region_year_pv_category", "nuts_regions"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "Behind-the-meter PV categories (full grid feed-in / self-consumption with or without storage): how the "
+        "mix has grown over time, whether it's similar across German states, plant-size distribution per "
+        "category, and a cross-check against usage sector / installation type."
+    ),
+)
+def page_pv_categories(context: AssetExecutionContext) -> None:
+    output_file = _run_page("03_pv_categories.py", "03_pv_categories.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
+page_assets = [page_mastr_capacity_de, page_mastr_vs_smard_capacity, page_pv_categories]

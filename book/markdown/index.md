@@ -27,8 +27,10 @@ reviewed against the new numbers.
   how it's grown over time.
 - **MaStR vs. SMARD capacity** — a live sanity check of MaStR-derived
   installed capacity against the Bundesnetzagentur's own official figures.
+- **PV categories** — behind-the-meter PV (grid-direct vs. self-consumption
+  with/without storage): growth over time, regional mix, plant-size
+  distribution, and a cross-check against usage sector / installation type.
 
 ## Roadmap
 
-- Behind-the-meter PV category breakdown.
 - PV + storage combination analysis.
