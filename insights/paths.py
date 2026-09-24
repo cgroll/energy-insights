@@ -9,7 +9,7 @@ rather than silently producing an empty page.
 from pathlib import Path
 
 INSIGHTS_ROOT = Path(__file__).resolve().parent.parent
-HUB_DATA = Path.home() / "research" / "energy-data-hub" / "data"
+HUB_DATA = Path.home() / "research" / "energy-platform" / "energy-data-hub" / "data"
 
 
 def hub_file(*parts: str) -> Path:

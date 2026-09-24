@@ -34,7 +34,7 @@ already materialized (`mastr_capacity_by_region_year`, `nuts_regions`,
 
 ```bash
 uv sync
-export DAGSTER_HOME=~/research/energy-data-hub/.dagster_home  # shared with the hub
+export DAGSTER_HOME=~/research/energy-platform/energy-data-hub/.dagster_home  # shared with the hub
 uv run dagster asset materialize --select page_mastr_capacity_de -f insights_dagster/definitions.py
 ```
 
@@ -42,7 +42,7 @@ Or, to see this repo's pages in the same Asset Graph as the hub's data (and
 refresh a page's upstream hub dependencies first via `+page_name`):
 
 ```bash
-cd ~/research/energy-data-hub
+cd ~/research/energy-platform/energy-data-hub
 uv run dagster dev -w workspace.yaml
 ```
 

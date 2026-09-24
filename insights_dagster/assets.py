@@ -121,9 +121,47 @@ def page_pecd_potential_vs_smard_observed(context: AssetExecutionContext) -> Non
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
+@asset(
+    name="page_pecd_wind_country_level_check",
+    deps=["pecd_wind_onshore_country_capacity_factor", "de_capacity_factor_current_fleet"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "PECD v4.2 doesn't expose country-level (nuts_0) capacity factor for wind, only solar -- confirmed "
+        "against the live CDS API. This page checks the hub's own replication of PECD's nuts_0 method (a naive, "
+        "unweighted spatial mean across DE's PEON zones) against de_capacity_factor_current_fleet's "
+        "MaStR-capacity-weighted series: monthly/annual overlay, daily scatter, and load duration curve."
+    ),
+)
+def page_pecd_wind_country_level_check(context: AssetExecutionContext) -> None:
+    output_file = _run_page("05_pecd_wind_country_level_check.py", "05_pecd_wind_country_level_check.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
+@asset(
+    name="page_pecd_simple_vs_mastr_weighted",
+    deps=["pecd_solar_country_capacity_factors", "pecd_wind_onshore_capacity_factors", "pecd_wind_offshore_capacity_factors", "peon_region_mask", "peof_region_mask", "de_capacity_factor_current_fleet"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "Exploratory, MaStR-free approximation of DE capacity factors: solar via fixed publicly-sourced "
+        "technology-mix weights, wind onshore/offshore via PECD zone-mask area weights (NaN-aware, "
+        "renormalized over modeled zones only) -- compared against de_capacity_factor_current_fleet's real "
+        "MaStR-weighted series. Not a new hub data asset -- see energy-data-hub/docs/pecd_data_availability.md."
+    ),
+)
+def page_pecd_simple_vs_mastr_weighted(context: AssetExecutionContext) -> None:
+    output_file = _run_page("06_pecd_simple_vs_mastr_weighted.py", "06_pecd_simple_vs_mastr_weighted.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
 page_assets = [
     page_mastr_capacity_de,
     page_mastr_vs_smard_capacity,
     page_pv_categories,
     page_pecd_potential_vs_smard_observed,
+    page_pecd_wind_country_level_check,
+    page_pecd_simple_vs_mastr_weighted,
 ]
