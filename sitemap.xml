@@ -22,4 +22,7 @@
   <url>
     <loc>http://localhost:3000/notebooks/ttf-gas-vs-power-price</loc>
   </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/pecd-country-comparison</loc>
+  </url>
 </urlset>
