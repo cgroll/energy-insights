@@ -176,6 +176,26 @@ def page_pecd_country_comparison(context: AssetExecutionContext) -> None:
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
+@asset(
+    name="page_re_buildout_battery_residual_load",
+    deps=["pecd_country_capacity_factors_simple", "smard_load", "mastr_capacity_by_region_year"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "Physical (not cost-optimised) sweep of RE buildout multiplier x aggregate battery duration against "
+        "SMARD's real hourly demand: average RE+battery share of demand, curtailment, peak residual load, and "
+        "worst multi-day shortfall per scenario. Narrower cousin of world-of-energy's "
+        "54_germany_energy_battery_mix_costs -- no LCOE/LP optimisation, just this hub's simple DE capacity "
+        "factors -- built to separate 'how much of average demand gets covered' from 'does the Dunkelflaute "
+        "tail go away' (it doesn't, even at unrealistic buildout + battery sizes)."
+    ),
+)
+def page_re_buildout_battery_residual_load(context: AssetExecutionContext) -> None:
+    output_file = _run_page("09_re_buildout_battery_residual_load.py", "09_re_buildout_battery_residual_load.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
 page_assets = [
     page_mastr_capacity_de,
     page_mastr_vs_smard_capacity,
@@ -184,4 +204,5 @@ page_assets = [
     page_pecd_simple_vs_mastr_weighted,
     page_ttf_gas_vs_power_price,
     page_pecd_country_comparison,
+    page_re_buildout_battery_residual_load,
 ]

@@ -42,10 +42,14 @@ reviewed against the new numbers.
   solar, wind onshore, and wind offshore across every PECD country: bar
   charts, a solar-vs-wind complementarity scatter, and choropleth maps
   (offshore mapped per individual zone, not collapsed to one country color).
+- **RE buildout + battery storage vs. residual load** — a physical (not
+  cost-optimised) sweep of RE buildout multiplier x battery duration against
+  real hourly demand: how much of demand gets covered on average, how much
+  gets curtailed, and whether either lever actually closes the Dunkelflaute
+  tail (it doesn't).
 
 ## Roadmap
 
 - Seasonal/monthly capacity-factor profiles for individual countries beyond
   Germany (interannual variability, monthly distributions) — a follow-up to
   the cross-country comparison page above.
-- PV + storage combination analysis.

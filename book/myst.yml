@@ -27,6 +27,9 @@ project:
     - title: Cross-country PECD comparison
       children:
         - file: notebooks/08_pecd_country_comparison.ipynb
+    - title: RE buildout + battery storage
+      children:
+        - file: notebooks/09_re_buildout_battery_residual_load.ipynb
 site:
   options:
     folders: true
