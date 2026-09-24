@@ -126,6 +126,14 @@ print(offshore_weights.round(3))
 
 # %% [markdown]
 # ## Comparison against `de_capacity_factor_current_fleet`
+#
+# Headline numbers below are computed **at native hourly resolution** --
+# every one of the ~96,400 hours 2015-2025, not the monthly/annual
+# aggregates the charts further down use for readability. Aggregating to
+# monthly (or coarser) smooths out a lot of hour-to-hour noise, so a
+# correlation/MAE computed on monthly means alone would overstate how well
+# the simple approximation tracks the real thing *within* a month -- shown
+# explicitly in the resolution-comparison table right after.
 
 # %%
 complex_cf = pd.read_parquet(hub_file("pecd", "de_capacity_factor_current_fleet.parquet"))
@@ -137,11 +145,17 @@ SERIES = {
 }
 
 
-def error_stats(simple: pd.Series, complex_: pd.Series) -> dict:
+def error_stats(simple: pd.Series, complex_: pd.Series, resample: str | None = None) -> dict:
+    """Deviation metrics between the two series. `resample=None` keeps the
+    native hourly resolution; e.g. `resample="D"` or `"MS"` averages both
+    series to that frequency first -- so the same function makes the
+    resolution-sensitivity comparison below an apples-to-apples one-liner."""
     df = pd.concat([simple.rename("simple"), complex_.rename("complex")], axis=1, sort=False).dropna()
+    if resample is not None:
+        df = df.resample(resample).mean()
     err = df["simple"] - df["complex"]
     return {
-        "n_hours": len(df),
+        "n_obs": len(df),
         "mean_simple": df["simple"].mean(),
         "mean_complex": df["complex"].mean(),
         "corr": df["simple"].corr(df["complex"]),
@@ -152,7 +166,22 @@ def error_stats(simple: pd.Series, complex_: pd.Series) -> dict:
 
 
 stats = pd.DataFrame({tech: error_stats(simple, complex_) for tech, (simple, complex_) in SERIES.items()}).T
+print("Hourly deviation metrics (native resolution):")
 print(stats.round(4))
+
+# %% [markdown]
+# ## Does resolution change the picture? Hourly vs. daily vs. monthly
+
+# %%
+resolutions = {"hourly": None, "daily": "D", "monthly": "MS"}
+by_resolution = pd.concat(
+    {
+        tech: pd.DataFrame({label: error_stats(simple, complex_, resample=freq) for label, freq in resolutions.items()}).T
+        for tech, (simple, complex_) in SERIES.items()
+    },
+    axis=0,
+)
+print(by_resolution[["n_obs", "corr", "mae_pp", "rmse_pp"]].round(4))
 
 # %% [markdown]
 # ## Monthly capacity factor, full history, per technology
@@ -218,3 +247,12 @@ plt.show()
 #   weights (solar) and area-weighted, NaN-aware zone means (wind) already
 #   get remarkably close to the fully fleet-weighted version for Germany,
 #   the one country where a true comparison is possible.
+# - **Resolution matters a lot for how good this looks**: the same
+#   comparison at monthly-mean resolution flatters both wind series --
+#   correlation climbs from ~0.975/0.977 (hourly) to ~0.994/0.995 (monthly),
+#   and MAE drops roughly 4x (e.g. wind offshore: 4.7 percentage points
+#   hourly vs. 1.3 monthly). Averaging a whole month together cancels out a
+#   lot of hour-to-hour disagreement that's real at the resolution most uses
+#   (e.g. Dunkelflaute analysis) actually care about -- the hourly numbers in
+#   the headline table above, not the monthly chart further up, are the
+#   honest measure of how well the simple approximation tracks reality.
