@@ -15,6 +15,7 @@ project:
     - title: MaStR capacity
       children:
         - file: notebooks/01_mastr_capacity_de.ipynb
+        - file: notebooks/02_mastr_vs_smard_capacity.ipynb
 site:
   options:
     folders: true

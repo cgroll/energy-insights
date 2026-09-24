@@ -70,4 +70,21 @@ def page_mastr_capacity_de(context: AssetExecutionContext) -> None:
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
-page_assets = [page_mastr_capacity_de]
+@asset(
+    name="page_mastr_vs_smard_capacity",
+    deps=["mastr_capacity_by_region_year", "smard_capacity_solar", "smard_capacity_wind_onshore", "smard_capacity_wind_offshore"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "MaStR-derived vs. SMARD's own official installed-capacity figures, year by year, for solar and "
+        "onshore/offshore wind -- a live sanity check on the MaStR-derived numbers used throughout this book, "
+        "replacing a one-off hand-copied comparison against a single press release."
+    ),
+)
+def page_mastr_vs_smard_capacity(context: AssetExecutionContext) -> None:
+    output_file = _run_page("02_mastr_vs_smard_capacity.py", "02_mastr_vs_smard_capacity.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
+page_assets = [page_mastr_capacity_de, page_mastr_vs_smard_capacity]

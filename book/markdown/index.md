@@ -25,9 +25,10 @@ reviewed against the new numbers.
 
 - **MaStR capacity** — installed wind + solar capacity: how much, where, and
   how it's grown over time.
+- **MaStR vs. SMARD capacity** — a live sanity check of MaStR-derived
+  installed capacity against the Bundesnetzagentur's own official figures.
 
 ## Roadmap
 
-- MaStR-vs-SMARD installed-capacity comparison.
 - Behind-the-meter PV category breakdown.
 - PV + storage combination analysis.
