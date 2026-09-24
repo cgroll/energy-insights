@@ -10,4 +10,7 @@
   <url>
     <loc>http://localhost:3000/notebooks/mastr-vs-smard-capacity</loc>
   </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/pv-categories</loc>
+  </url>
 </urlset>
