@@ -24,6 +24,9 @@ project:
     - title: Gas vs. power price
       children:
         - file: notebooks/07_ttf_gas_vs_power_price.ipynb
+    - title: Cross-country PECD comparison
+      children:
+        - file: notebooks/08_pecd_country_comparison.ipynb
 site:
   options:
     folders: true

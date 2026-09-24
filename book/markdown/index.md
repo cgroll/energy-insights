@@ -38,7 +38,14 @@ reviewed against the new numbers.
   area-weighted PECD zones for wind) gets against the real MaStR-weighted
   series — a first step towards a capacity factor for countries with no
   MaStR-style registry.
+- **Cross-country PECD comparison** — long-run mean capacity factors for
+  solar, wind onshore, and wind offshore across every PECD country: bar
+  charts, a solar-vs-wind complementarity scatter, and choropleth maps
+  (offshore mapped per individual zone, not collapsed to one country color).
 
 ## Roadmap
 
+- Seasonal/monthly capacity-factor profiles for individual countries beyond
+  Germany (interannual variability, monthly distributions) — a follow-up to
+  the cross-country comparison page above.
 - PV + storage combination analysis.

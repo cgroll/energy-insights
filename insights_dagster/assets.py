@@ -157,6 +157,25 @@ def page_ttf_gas_vs_power_price(context: AssetExecutionContext) -> None:
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
+@asset(
+    name="page_pecd_country_comparison",
+    deps=["pecd_country_capacity_factors_simple", "pecd_wind_offshore_europe_capacity_factors", "peof_region_mask"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "Cross-country long-run mean capacity factors for solar PV, wind onshore, and wind offshore: horizontal "
+        "bar charts, a solar-vs-onshore-wind complementarity scatter, and choropleth maps -- replicating "
+        "world-of-energy's 37_analyse_pecd page against this hub's own pecd_country_capacity_factors_simple. "
+        "Offshore is mapped per individual p2of zone (rasterized from the peof zone mask) rather than "
+        "collapsed to one color per country, to show within-country variation (e.g. North Sea vs. Baltic)."
+    ),
+)
+def page_pecd_country_comparison(context: AssetExecutionContext) -> None:
+    output_file = _run_page("08_pecd_country_comparison.py", "08_pecd_country_comparison.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
 page_assets = [
     page_mastr_capacity_de,
     page_mastr_vs_smard_capacity,
@@ -164,4 +183,5 @@ page_assets = [
     page_pecd_potential_vs_smard_observed,
     page_pecd_simple_vs_mastr_weighted,
     page_ttf_gas_vs_power_price,
+    page_pecd_country_comparison,
 ]

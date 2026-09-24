@@ -22,6 +22,7 @@ dependencies = [
     "pillow>=10.0.0",
     "xarray>=2024.9.0",
     "netcdf4>=1.7.0",
+    "cartopy>=0.26.0",
 ]
 
 [build-system]
