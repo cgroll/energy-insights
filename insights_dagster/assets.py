@@ -139,10 +139,28 @@ def page_pecd_simple_vs_mastr_weighted(context: AssetExecutionContext) -> None:
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
+@asset(
+    name="page_ttf_gas_vs_power_price",
+    deps=["ttf_gas_price", "smard_price_de_lu"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "Monthly average TTF gas price vs. SMARD's DE-LU day-ahead power price -- both in EUR/MWh, plotted on "
+        "one shared axis. Full-history overlay, a correlation scatter, and the power-minus-gas spread over "
+        "time, as a first look at how closely gas tracks the merit-order price-setting story in Germany."
+    ),
+)
+def page_ttf_gas_vs_power_price(context: AssetExecutionContext) -> None:
+    output_file = _run_page("07_ttf_gas_vs_power_price.py", "07_ttf_gas_vs_power_price.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
 page_assets = [
     page_mastr_capacity_de,
     page_mastr_vs_smard_capacity,
     page_pv_categories,
     page_pecd_potential_vs_smard_observed,
     page_pecd_simple_vs_mastr_weighted,
+    page_ttf_gas_vs_power_price,
 ]

@@ -21,6 +21,9 @@ project:
       children:
         - file: notebooks/04_pecd_potential_vs_smard_observed.ipynb
         - file: notebooks/06_pecd_simple_vs_mastr_weighted.ipynb
+    - title: Gas vs. power price
+      children:
+        - file: notebooks/07_ttf_gas_vs_power_price.ipynb
 site:
   options:
     folders: true
