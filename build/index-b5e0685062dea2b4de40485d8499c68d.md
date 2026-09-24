@@ -30,6 +30,9 @@ reviewed against the new numbers.
 - **PV categories** — behind-the-meter PV (grid-direct vs. self-consumption
   with/without storage): growth over time, regional mix, plant-size
   distribution, and a cross-check against usage sector / installation type.
+- **PECD potential validation** — how far PECD-derived renewable potential
+  sits from what SMARD reports Germany actually produced, and whether that
+  gap looks like curtailment/self-consumption rather than a modeling error.
 
 ## Roadmap
 

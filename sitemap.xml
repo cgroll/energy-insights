@@ -13,4 +13,7 @@
   <url>
     <loc>http://localhost:3000/notebooks/pv-categories</loc>
   </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/pecd-potential-vs-smard-observed</loc>
+  </url>
 </urlset>
