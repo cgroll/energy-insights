@@ -25,4 +25,7 @@
   <url>
     <loc>http://localhost:3000/notebooks/pecd-country-comparison</loc>
   </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/re-buildout-battery-residual-load</loc>
+  </url>
 </urlset>
