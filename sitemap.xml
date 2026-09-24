@@ -16,4 +16,10 @@
   <url>
     <loc>http://localhost:3000/notebooks/pecd-potential-vs-smard-observed</loc>
   </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/pecd-wind-country-level-check</loc>
+  </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/pecd-simple-vs-mastr-weighted</loc>
+  </url>
 </urlset>
