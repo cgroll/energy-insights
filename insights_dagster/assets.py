@@ -104,4 +104,26 @@ def page_pv_categories(context: AssetExecutionContext) -> None:
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
-page_assets = [page_mastr_capacity_de, page_mastr_vs_smard_capacity, page_pv_categories]
+@asset(
+    name="page_pecd_potential_vs_smard_observed",
+    deps=["de_potential_historic", "mastr_capacity_by_region_year", "smard_generation_solar", "smard_generation_wind_onshore", "smard_generation_wind_offshore"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "PECD-derived renewable potential (de_potential_historic) vs. SMARD's actually observed generation: "
+        "headline error stats, monthly-mean overlay, an hourly zoom-in, and capacity-factor/GW scatter views. "
+        "Mirrors pecd-power-validity-DE's potential-vs-observed analysis against the hub's own potential panel."
+    ),
+)
+def page_pecd_potential_vs_smard_observed(context: AssetExecutionContext) -> None:
+    output_file = _run_page("04_pecd_potential_vs_smard_observed.py", "04_pecd_potential_vs_smard_observed.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
+page_assets = [
+    page_mastr_capacity_de,
+    page_mastr_vs_smard_capacity,
+    page_pv_categories,
+    page_pecd_potential_vs_smard_observed,
+]

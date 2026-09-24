@@ -17,6 +17,9 @@ project:
         - file: notebooks/01_mastr_capacity_de.ipynb
         - file: notebooks/02_mastr_vs_smard_capacity.ipynb
         - file: notebooks/03_pv_categories.ipynb
+    - title: PECD potential validation
+      children:
+        - file: notebooks/04_pecd_potential_vs_smard_observed.ipynb
 site:
   options:
     folders: true
