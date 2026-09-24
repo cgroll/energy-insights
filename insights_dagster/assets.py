@@ -123,15 +123,16 @@ def page_pecd_potential_vs_smard_observed(context: AssetExecutionContext) -> Non
 
 @asset(
     name="page_pecd_simple_vs_mastr_weighted",
-    deps=["pecd_solar_country_capacity_factors", "pecd_wind_onshore_capacity_factors", "pecd_wind_offshore_capacity_factors", "peon_region_mask", "peof_region_mask", "de_capacity_factor_current_fleet"],
+    deps=["pecd_country_capacity_factors_simple", "de_capacity_factor_current_fleet"],
     group_name="pages",
     kinds={"notebook"},
     tags=_PAGE_TAGS,
     description=(
-        "Exploratory, MaStR-free approximation of DE capacity factors: solar via fixed publicly-sourced "
-        "technology-mix weights, wind onshore/offshore via PECD zone-mask area weights (NaN-aware, "
-        "renormalized over modeled zones only) -- compared against de_capacity_factor_current_fleet's real "
-        "MaStR-weighted series. Not a new hub data asset -- see energy-data-hub/docs/pecd_data_availability.md."
+        "DE columns of pecd_country_capacity_factors_simple (MaStR-free approximation: solar via fixed "
+        "publicly-sourced technology-mix weights, wind onshore/offshore via PECD zone-mask area weights) "
+        "compared against de_capacity_factor_current_fleet's real MaStR-weighted series -- the one country "
+        "where that comparison is possible. This page prototyped the hub asset's methodology; it now reads "
+        "the asset's output rather than recomputing it. See energy-data-hub/docs/pecd_data_availability.md."
     ),
 )
 def page_pecd_simple_vs_mastr_weighted(context: AssetExecutionContext) -> None:

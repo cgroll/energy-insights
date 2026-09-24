@@ -19,13 +19,14 @@
 # fleet data at all -- just PECD's own capacity factors plus a couple of
 # publicly known, fixed weights?
 #
-# **This is exploratory only.** Nothing here becomes a new hub data asset --
-# see `energy-data-hub/docs/pecd_data_availability.md`. The point of building
-# it this simply is that, unlike MaStR, it has no Germany-only ceiling: the
-# same fixed weights below could eventually run against every PECD country in
-# `pecd_wind_onshore_europe_capacity_factors` / `..._offshore_...` (already
-# downloaded full-Europe, see that same doc) to get a first-cut capacity
-# factor for countries that will never have a MaStR-style unit registry.
+# **This page's own prototype became a real hub asset.** The fixed-weight
+# approximation below is no longer computed here -- it's read straight from
+# `pecd_country_capacity_factors_simple` (`edh/pecd.py` /
+# `edh_dagster/assets/pecd.py`), which generalized exactly this page's
+# methodology to every PECD country, not just Germany. This page now only
+# picks out the `DE` column and compares it against the real, MaStR-weighted
+# `de_capacity_factor_current_fleet` -- the one country where that comparison
+# is possible at all.
 #
 # ## The weights used, explicitly
 #
@@ -33,10 +34,9 @@
 # series per technology (`60` industrial rooftop, `61` residential rooftop,
 # `62` utility fixed-tilt, `63` utility tracking) with no region aggregation
 # needed. The open question is only how to blend these four into one number.
-# Fixed weights below, held constant across the whole 2015-2025 history (not
-# MaStR, but not equal-weighted either -- equal weights would hand
-# utility-tracking a quarter of the mix, when it's close to absent in
-# Germany):
+# Fixed weights below, held constant across the whole history (not MaStR, but
+# not equal-weighted either -- equal weights would hand utility-tracking a
+# quarter of the mix, when it's close to absent in Germany):
 #
 # | technology | weight | basis |
 # |---|---|---|
@@ -45,84 +45,47 @@
 # | `61` residential rooftop | 39% | 2025 additions: 5.2 GW private roof vs. 3.7 GW large commercial roof (BSW-Solar) -> ~58/42 split of the ~67% rooftop share |
 # | `60` industrial/commercial rooftop | 28% | the remaining ~42% of the rooftop share |
 #
+# **⚠️ These are DE-market weights, and `pecd_country_capacity_factors_simple`
+# currently applies them to every PECD country, not just Germany** -- no
+# equivalent per-country technology-mix data has been sourced yet (checked
+# 2026-09-24: SolarPower Europe's country segment tables are member-only, and
+# nothing at all splits utility fixed-tilt vs. tracking by country). That's a
+# real, potentially large distortion for any *other* country's solar column in
+# that hub asset -- see its `data_quality_warning` metadata and
+# `energy-data-hub/README.md`'s "Known data-quality caveats". Not an issue for
+# this page, which only ever looks at `DE`.
+#
 # **Wind onshore/offshore** -- PECD has no `nuts_0` product for wind at all
 # (confirmed against the live CDS API, see
 # `energy-data-hub/docs/pecd_data_availability.md`), only zone-level
-# (`PEON`/`PEOF`). The simple approximation here: weight each
-# zone by its physical area (from PECD's own rasterized zone mask, the same
-# file `edh.region_geo.fractional_zone_weights` uses for MaStR unit
-# assignment), not by installed capacity -- i.e. assume turbines are spread
-# uniformly per km² rather than concentrated by real siting. Zones PECD
-# never modeled (100% NaN capacity factor -- true for 3 of DE's 6 PEOF
-# offshore zones) are dropped and the remaining zones' weights renormalized
-# to sum to 1, rather than silently letting pandas' default `skipna` sum
-# treat a dropped zone's weight as zero without redistributing it (that bug,
-# caught before writing this page, is exactly why offshore's first pass
-# looked far worse than it actually is).
+# (`PEON`/`PEOF`). The simple approximation here: weight each zone by its
+# physical area (from PECD's own rasterized zone mask), not by installed
+# capacity -- i.e. assume turbines are spread uniformly per km² rather than
+# concentrated by real siting. Zones PECD never modeled (100% NaN capacity
+# factor) are dropped and the remaining zones' weights renormalized to sum to
+# 1 -- this generalizes cleanly per country since it's real geometry, not a
+# borrowed default (unlike solar above).
 
 # %%
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import xarray as xr
 
 from insights.paths import hub_file
 
 COMPLEX_COLOR = "#2a78d6"  # de_capacity_factor_current_fleet -- MaStR-weighted, this hub's real product
-SIMPLE_COLOR = "#eb6834"  # this page's fixed-weight approximation -- no MaStR involved
-
-SOLAR_WEIGHTS = {"62": 0.31, "63": 0.02, "61": 0.39, "60": 0.28}  # see table above
+SIMPLE_COLOR = "#eb6834"  # pecd_country_capacity_factors_simple -- no MaStR involved
 
 # %% [markdown]
-# ## Solar: fixed technology-mix weights
+# ## DE columns from `pecd_country_capacity_factors_simple`
 
 # %%
-assert abs(sum(SOLAR_WEIGHTS.values()) - 1.0) < 1e-9
-print(pd.Series(SOLAR_WEIGHTS, name="weight").rename_axis("pecd_technology"))
+country_simple = pd.read_parquet(hub_file("pecd", "pecd_country_capacity_factors_simple.parquet"))
+de_simple = country_simple.xs("DE", axis=1, level="country")
 
-solar_tech = pd.read_parquet(hub_file("pecd", "pecd_solar_country_capacity_factors.parquet"))
-solar_simple = sum(solar_tech[tech] * weight for tech, weight in SOLAR_WEIGHTS.items()).rename("simple")
-
-# %% [markdown]
-# ## Wind onshore/offshore: area weights from PECD's own zone mask
-
-# %%
-def zone_area_weights(mask_file, cf_columns, zone_prefix: str = "DE") -> pd.Series:
-    """Relative land/sea area per zone: sum of each 0.25-degree cell's
-    fractional zone coverage, weighted by cos(latitude) (cells narrow
-    towards the poles in the longitude direction; latitude degrees don't
-    change) -- restricted to `cf_columns` (i.e. zones PECD actually modeled,
-    dropping the all-NaN ones) and renormalized to sum to 1 over those."""
-    ds = xr.open_dataset(mask_file)
-    zones = [z for z in cf_columns if z in ds["region"].values]
-    mask_values = ds["mask"].sel(region=zones).values  # (zone, lat, lon)
-    lat_weight = np.cos(np.radians(ds["latitude"].values))[None, :, None]
-    ds.close()
-
-    area = pd.Series((mask_values * lat_weight).sum(axis=(1, 2)), index=zones)
-    return area / area.sum()
-
-
-def area_weighted_zone_mean(cf: pd.DataFrame, mask_file) -> tuple[pd.Series, pd.Series]:
-    """Area-weighted mean across whichever of `cf`'s zone columns PECD
-    actually modeled (all-NaN columns excluded from both the mean and the
-    weight renormalization -- see module docstring)."""
-    modeled = cf.columns[cf.notna().any()]
-    weights = zone_area_weights(mask_file, modeled)
-    return (cf[weights.index] * weights).sum(axis=1), weights
-
-
-onshore_zone_cf = pd.read_parquet(hub_file("pecd", "pecd_wind_onshore_capacity_factors.parquet"))
-offshore_zone_cf = pd.read_parquet(hub_file("pecd", "pecd_wind_offshore_capacity_factors.parquet"))
-
-onshore_simple, onshore_weights = area_weighted_zone_mean(onshore_zone_cf, hub_file("pecd", "peon_region_mask.nc"))
-offshore_simple, offshore_weights = area_weighted_zone_mean(offshore_zone_cf, hub_file("pecd", "peof_region_mask.nc"))
-
-print("Onshore PEON zone area weights (all 7 DE zones modeled):")
-print(onshore_weights.round(3))
-print(f"\nOffshore PEOF zone area weights ({len(offshore_weights)} of {offshore_zone_cf.shape[1]} DE zones modeled -- "
-      f"{sorted(set(offshore_zone_cf.columns) - set(offshore_weights.index))} are 100% NaN, excluded):")
-print(offshore_weights.round(3))
+solar_simple = de_simple["solar"].rename("simple")
+onshore_simple = de_simple["wind_onshore"].rename("simple")
+offshore_simple = de_simple["wind_offshore"].rename("simple")
 
 # %% [markdown]
 # ## Comparison against `de_capacity_factor_current_fleet`
@@ -233,24 +196,33 @@ plt.show()
 #   meaningfully better than, a plain unweighted mean across zones would be.
 #   Germany's 7 PEON zones don't differ enough in area for area-weighting to
 #   add much over equal weighting.
-# - **Wind offshore matches well once the all-NaN zones are handled
-#   correctly**: correlation ~0.977, bias ~+1 percentage point. The first
-#   attempt at this (not shown) got a ~20% *relative* bias by summing
-#   zone-weight x capacity-factor with pandas' default NaN skipping --
-#   silently dropping ~23% of the area weight (the 3 unmodeled PEOF zones)
-#   without redistributing it, rather than a real property of offshore
-#   siting. Renormalizing over only the modeled zones fixes essentially all
-#   of the gap.
-# - **Net**: for a first-cut, MaStR-free capacity factor -- e.g. to eventually
-#   extend beyond Germany to every PECD country -- fixed technology-mix
-#   weights (solar) and area-weighted, NaN-aware zone means (wind) already
-#   get remarkably close to the fully fleet-weighted version for Germany,
-#   the one country where a true comparison is possible.
+# - **Wind offshore matches well, even on the coarser scheme the hub asset
+#   actually uses**: correlation ~0.986, bias ~+1.3 percentage points. Note
+#   this page originally prototyped offshore as an *area-weighted* mean of
+#   `peof` zones (renormalized over whichever zones PECD actually modeled,
+#   after catching a ~20% relative-bias bug from pandas silently dropping the
+#   3 unmodeled PEOF zones' weight without redistributing it) -- but
+#   `pecd_country_capacity_factors_simple` uses a plain *unweighted* mean of
+#   the coarser `p2of` scheme instead, since `p2of`'s zone codes don't match
+#   the existing `peof` mask (see `edh/pecd.py` module comment). The two
+#   schemes score close enough (~0.977 area-weighted `peof` vs. ~0.986
+#   unweighted `p2of`, in this DE-only comparison) that the switch was worth
+#   it for full-Europe compatibility.
+# - **Net**: for a first-cut, MaStR-free capacity factor, fixed technology-mix
+#   weights (solar) and area-weighted, NaN-aware zone means (wind) already get
+#   remarkably close to the fully fleet-weighted version for Germany, the one
+#   country where a true comparison is possible -- which is why
+#   `pecd_country_capacity_factors_simple` now runs the same methodology for
+#   every PECD country. **Caveat that doesn't show up in this page's numbers:**
+#   wind's per-country weights are real geometry and generalize cleanly, but
+#   solar's technology-mix weights are still Germany's, reused for every other
+#   country with no validation -- this page can only confirm the approach
+#   works well *for Germany*, not that it works well everywhere it now runs.
 # - **Resolution matters a lot for how good this looks**: the same
 #   comparison at monthly-mean resolution flatters both wind series --
-#   correlation climbs from ~0.975/0.977 (hourly) to ~0.994/0.995 (monthly),
-#   and MAE drops roughly 4x (e.g. wind offshore: 4.7 percentage points
-#   hourly vs. 1.3 monthly). Averaging a whole month together cancels out a
+#   correlation climbs from ~0.975/0.986 (hourly) to ~0.994/0.997 (monthly),
+#   and MAE drops roughly 3x (e.g. wind offshore: 3.8 percentage points
+#   hourly vs. 1.4 monthly). Averaging a whole month together cancels out a
 #   lot of hour-to-hour disagreement that's real at the resolution most uses
 #   (e.g. Dunkelflaute analysis) actually care about -- the hourly numbers in
 #   the headline table above, not the monthly chart further up, are the
