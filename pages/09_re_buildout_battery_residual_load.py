@@ -18,34 +18,28 @@
 # question with this hub's simplest capacity-factor product
 # (`pecd_country_capacity_factors_simple`, the plain area/technology-mix
 # average used throughout this book, not MaStR-weighted): **if Germany scales
-# up today's wind+solar fleet by some factor and adds a battery of some size,
-# how much of real demand ends up covered, how much surplus gets curtailed,
-# and does either lever actually make Dunkelflauten go away?** No costs, no
-# optimisation -- just a buildout multiplier and a battery size, swept over a
-# grid, against real hourly demand rather than a constant or weekday-average
-# assumption.
+# up today's wind+solar fleet by some factor, how much of real demand ends up
+# covered and how much surplus gets curtailed -- and once a battery is added
+# on top, how much of that curtailed surplus actually becomes useful, and
+# does it make Dunkelflauten go away?** No costs, no optimisation -- just a
+# buildout multiplier and (later) a battery size, against real hourly demand
+# rather than a constant or weekday-average assumption.
 #
 # **Method, in one paragraph:** today's installed solar/onshore/offshore
 # capacity (`capacity_by_region_year`, latest snapshot) is scaled by a single
-# multiplier -- so the technology *mix* is held fixed at today's ratio, only
-# its overall size changes. Hourly generation is capacity factor x scaled
-# capacity, dispatched against SMARD's actual hourly `total_load` (real
-# demand, not modeled). A single aggregate battery (round-trip efficiency
-# 90%, split equally between charge/discharge via sqrt) absorbs surplus up to
-# its power and energy limits; anything it can't take is curtailed.
-# Shortfalls it can't cover are the residual load -- whatever a real system
-# would need to import or burn gas for. This deliberately reuses
-# `54`'s battery-physics approach (same split-efficiency dispatch) while
-# dropping everything cost-related, so the result speaks to physical
-# feasibility, not economics.
+# multiplier -- the technology *mix* is held fixed at today's ratio, only its
+# overall size changes. Hourly generation is capacity factor x scaled
+# capacity, compared hour by hour against SMARD's actual `total_load` (real
+# demand, not modeled). Section 1 looks at buildout alone, with no storage at
+# all, to build intuition for the underlying supply/demand mismatch. Section
+# 2 then adds a single aggregate battery and asks specifically how much of
+# the surplus that buildout alone would otherwise waste, storage can
+# actually capture and deliver back.
 #
 # **What this does *not* model:** transmission constraints, other
 # flexibility (demand response, hydro, interconnectors), or a
-# multi-technology battery/gas cost trade-off -- see `54` for that fuller
-# picture. The point here is simpler: separate two questions that are easy
-# to conflate -- "how much of *average* demand can renewables + storage
-# cover" vs. "does that make the worst-case Dunkelflaute go away" -- and show
-# that the answers move very differently.
+# multi-technology battery/gas cost trade-off -- see `54` for that fuller,
+# cost-optimised picture.
 
 # %%
 import numpy as np
@@ -54,20 +48,23 @@ import matplotlib.pyplot as plt
 
 from insights.paths import hub_file
 
-# Technology colors, consistent with this book's other PECD pages (04, 06, 08)
-TECH_COLORS = {"solar": "#eda100", "wind_onshore": "#2a78d6", "wind_offshore": "#1baf7a"}
+DIRECT_COLOR = "#2a78d6"      # RE used directly
+RESIDUAL_COLOR = "#a9a8a2"    # unmet demand -- gas/import
+CURTAILED_COLOR = "#e34948"   # generated but wasted
+DELIVERED_COLOR = "#1baf7a"   # RE delivered later via battery
 
 # Battery scenarios are an *ordinal* series (increasing storage duration), so
 # they get a single-hue sequential ramp rather than distinct categorical
-# hues -- "no battery" in neutral gray, then light-to-dark blue with duration.
+# hues -- "no battery" in neutral gray, then light-to-dark blue with size.
 BATTERY_COLORS = {
     "No battery": "#a9a8a2",
     "4h battery": "#9ec5f4",
-    "24h battery (1 day)": "#3987e5",
-    "168h battery (1 week)": "#0d366b",
+    "24h battery": "#3987e5",
+    "168h battery": "#0d366b",
 }
 
 DE_LU_CREATION_DATE = "2018-10-01"  # see 04's note: SMARD's DE-LU load/generation series is unreliable before this
+MULTIPLIERS = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0]
 
 # %% [markdown]
 # ## Data
@@ -108,116 +105,286 @@ print(f"Current installed capacity ({latest_year} snapshot):")
 for tech, mw in CURRENT_CAPACITY_MW.items():
     print(f"  {tech:15s}  {mw / 1000:6.1f} GW")
 print(f"  {'total':15s}  {total_current_gw:6.1f} GW")
-print(f"\nAt today's size, mean RE potential / mean demand = "
-      f"{sum(cf_arrays[t].mean() * CURRENT_CAPACITY_MW[t] for t in TECHS) / avg_demand_mw:.0%}")
+
+
+def re_generation(buildout_multiplier: float) -> np.ndarray:
+    return sum(cf_arrays[t] * CURRENT_CAPACITY_MW[t] * buildout_multiplier for t in TECHS)
+
 
 # %% [markdown]
-# ## Battery dispatch simulation
+# ## 1. Buildout alone, no storage
 #
-# One aggregate battery: surplus (generation > demand) charges it, up to its
-# power and remaining energy headroom; anything beyond that is curtailed.
-# Deficits discharge it, up to its power and remaining state of charge;
-# anything beyond that is residual load. Charge/discharge losses are split
-# equally via `sqrt(round-trip efficiency)`, matching `54`'s battery model.
+# With no battery, every hour splits cleanly in two: a **surplus** hour
+# (generation > demand) covers all of demand directly and wastes the rest as
+# curtailment; a **deficit** hour covers only part of demand from RE, and the
+# rest is residual load someone else has to supply. Four numbers per hour,
+# by construction:
+#
+# - `direct use = min(generation, demand)`
+# - `curtailed = max(generation - demand, 0)`
+# - `residual load = max(demand - generation, 0)`
+# - always: `direct use + residual load = demand`, and `direct use + curtailed = generation`
+#
+# Averaging these over the ~7-year record gives one row per buildout
+# scenario below.
+
+# %%
+baseline_rows = []
+for multiplier in MULTIPLIERS:
+    gen = re_generation(multiplier)
+    direct = np.minimum(gen, demand)
+    curtailed = np.maximum(gen - demand, 0.0)
+    residual = np.maximum(demand - gen, 0.0)
+    baseline_rows.append({
+        "multiplier": multiplier,
+        "avg_demand_gw": demand.mean() / 1000,
+        "avg_generated_gw": gen.mean() / 1000,
+        "avg_direct_use_gw": direct.mean() / 1000,
+        "avg_curtailed_gw": curtailed.mean() / 1000,
+        "avg_residual_gw": residual.mean() / 1000,
+        "curtailed_pct_of_generated": curtailed.mean() / gen.mean(),
+        "residual_pct_of_demand": residual.mean() / demand.mean(),
+    })
+
+baseline = pd.DataFrame(baseline_rows)
+pd.set_option("display.float_format", lambda v: f"{v:.2f}")
+print(baseline.to_string(index=False))
+
+# %% [markdown]
+# ### The same table, as a picture
+#
+# One stacked column per buildout multiplier. Below the dashed demand line:
+# direct RE use (blue) + residual load (gray) -- these two always sum to
+# demand exactly, so the stack top touches the line by construction. Above
+# the line: curtailed generation (red) -- energy produced but not usable
+# that hour, because there was already enough.
+
+# %%
+fig, ax = plt.subplots(figsize=(10, 6))
+x = np.arange(len(MULTIPLIERS))
+width = 0.6
+
+ax.bar(x, baseline["avg_direct_use_gw"], width, color=DIRECT_COLOR, label="Direct RE use")
+ax.bar(x, baseline["avg_residual_gw"], width, bottom=baseline["avg_direct_use_gw"], color=RESIDUAL_COLOR, label="Residual load (gas/import)")
+ax.bar(x, baseline["avg_curtailed_gw"], width, bottom=baseline["avg_demand_gw"], color=CURTAILED_COLOR, alpha=0.75, label="Curtailed (wasted)")
+
+ax.axhline(avg_demand_mw / 1000, color="#0b0b0b", linewidth=1, linestyle="--", zorder=0)
+ax.text(len(MULTIPLIERS) - 0.3, avg_demand_mw / 1000, " = average demand", va="bottom", ha="right", fontsize=8)
+
+ax.set_xticks(x)
+ax.set_xticklabels([f"{m:g}x" for m in MULTIPLIERS])
+ax.set_xlabel("RE buildout multiplier (x today's fleet)")
+ax.set_ylabel("Average power [GW]")
+ax.set_title("No battery: what happens to demand as RE buildout grows")
+ax.yaxis.grid(True, linewidth=0.4, alpha=0.6)
+ax.set_axisbelow(True)
+ax.legend(fontsize=9, loc="upper left")
+fig.tight_layout()
+plt.show()
+
+# %% [markdown]
+# Today's fleet (1x) covers 56% of demand directly on average (31 GW of
+# 55 GW) and wastes almost nothing (6% of what it generates). Doubling it
+# (2x) more than halves the residual gap (44%→20% of demand) -- but a third
+# of everything generated is now curtailed. By 8x, residual load is down to
+# a mere 2% of demand, but **79% of all generated RE is thrown away** --
+# exactly the "mega overproduce, then waste most of it" pattern the
+# introduction expected, laid out in GW rather than just percentages.
+
+# %% [markdown]
+# ## 2. Adding a battery: how much of the waste becomes useful?
+#
+# A single aggregate battery: surplus hours charge it (instead of curtailing
+# immediately); deficit hours discharge it (instead of leaving the gap as
+# residual load), up to its remaining energy headroom. Charge/discharge
+# losses are split equally via `sqrt(round-trip efficiency)`, matching `54`'s
+# battery model.
+#
+# **Sizing, and why there's no power/C-rate limit here:** an earlier version
+# of this page gave every battery the same fixed *power* rating and only
+# varied how many hours it could sustain that power -- but checking the
+# data, that fixed power rating turned out to be the binding constraint in
+# most deficit hours, not the energy capacity being varied. That defeats the
+# point of a "how much *storage* helps" sweep. So this version drops the
+# power limit entirely and sizes each battery purely by energy capacity,
+# expressed the transparent way: **`N` hours of average national demand**,
+# with unlimited charge/discharge rate.
+#
+# ```
+# capacity [GWh] = N x average demand [GW]
+# ```
+#
+# This is a deliberately generous assumption for the battery side (real
+# batteries also have a finite power rating) -- so any Dunkelflaute-tail
+# result that still holds under it would hold even harder for a real,
+# power-limited battery.
 
 # %%
 BATTERY_ROUND_TRIP_EFFICIENCY = 0.90
 EFF = np.sqrt(BATTERY_ROUND_TRIP_EFFICIENCY)
 
-# Power capacity fixed at 30% of average demand across all battery scenarios
-# (generous enough that duration -- the energy capacity -- is almost always
-# the binding constraint, not power) so the sweep below isolates the effect
-# of storage *duration*.
-BATTERY_POWER_MW = 0.30 * avg_demand_mw
+BATTERY_SCENARIOS = {"No battery": 0.0, "4h battery": 4.0, "24h battery": 24.0, "168h battery": 168.0}
 
-BATTERY_SCENARIOS = {
-    "No battery": 0.0,
-    "4h battery": 4.0,
-    "24h battery (1 day)": 24.0,
-    "168h battery (1 week)": 168.0,
-}
+print("Battery scenarios (unlimited power; energy capacity = N hours of average demand):")
+for label, duration_h in BATTERY_SCENARIOS.items():
+    cap_gwh = duration_h * avg_demand_mw / 1000
+    print(f"  {label:14s}  {duration_h:5.0f} h of avg demand   {cap_gwh:9,.0f} GWh  ({cap_gwh / 1000:.2f} TWh)")
 
 
-def simulate(buildout_multiplier: float, duration_h: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Hourly (generation, residual_load, curtailed) arrays for one scenario."""
-    gen = sum(cf_arrays[t] * CURRENT_CAPACITY_MW[t] * buildout_multiplier for t in TECHS)
-    power_mw = BATTERY_POWER_MW if duration_h > 0 else 0.0
-    cap_mwh = power_mw * duration_h
+def simulate(buildout_multiplier: float, duration_h: float) -> dict[str, np.ndarray]:
+    """Hourly (generation, direct, delivered, curtailed, residual) arrays for one scenario."""
+    gen = re_generation(buildout_multiplier)
+    cap_mwh = duration_h * avg_demand_mw
 
     n = len(gen)
     soc = 0.0
     residual = np.empty(n)
     curtailed = np.empty(n)
+    delivered = np.empty(n)
     for i in range(n):
         net = gen[i] - demand[i]
         if net > 0:
-            can_take = min(net, power_mw, (cap_mwh - soc) / EFF) if cap_mwh > 0 else 0.0
+            can_take = min(net, (cap_mwh - soc) / EFF) if cap_mwh > 0 else 0.0
             soc += can_take * EFF
             curtailed[i] = net - can_take
             residual[i] = 0.0
+            delivered[i] = 0.0
         else:
             deficit = -net
-            can_give = min(deficit / EFF, power_mw / EFF, soc) if cap_mwh > 0 else 0.0
+            can_give = min(deficit / EFF, soc) if cap_mwh > 0 else 0.0
             soc -= can_give
-            residual[i] = deficit - can_give * EFF
+            delivered[i] = can_give * EFF
+            residual[i] = deficit - delivered[i]
             curtailed[i] = 0.0
-    return gen, residual, curtailed
-
-
-def scenario_metrics(gen: np.ndarray, residual: np.ndarray, curtailed: np.ndarray) -> dict:
-    avg_re_share = 1 - residual.mean() / avg_demand_mw
-    curtailment_share = curtailed.sum() / gen.sum()
-
-    # Worst sustained shortfall episode: peak-to-trough drawdown of the
-    # cumulative (curtailed - residual) balance, same definition as 54's
-    # "system drawdown" module. Reported as an energy magnitude (in units of
-    # average demand-days) rather than a duration -- see the markdown note
-    # below the drawdown chart for why duration is the less robust of the two.
-    balance = np.cumsum(curtailed - residual)
-    running_max = np.maximum.accumulate(balance)
-    trough_idx = int(np.argmin(balance - running_max))
-    peak_val = running_max[trough_idx]
-    magnitude_mwh = peak_val - balance[trough_idx]
 
     return {
-        "avg_re_share": avg_re_share,
-        "curtailment_share": curtailment_share,
-        "peak_residual_frac": residual.max() / avg_demand_mw,
-        "worst_drawdown_demand_days": magnitude_mwh / avg_demand_mw / 24,
+        "gen": gen,
+        "direct": np.minimum(gen, demand),
+        "delivered": delivered,
+        "curtailed": curtailed,
+        "residual": residual,
     }
 
 
-MULTIPLIERS = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0]
-
-results = []
-for multiplier in MULTIPLIERS:
-    for label, duration_h in BATTERY_SCENARIOS.items():
-        gen, residual, curtailed = simulate(multiplier, duration_h)
-        metrics = scenario_metrics(gen, residual, curtailed)
-        results.append({
-            "multiplier": multiplier,
-            "battery": label,
-            "battery_capacity_gwh": BATTERY_POWER_MW * duration_h / 1000,
-            **metrics,
-        })
-
-results = pd.DataFrame(results)
-print("Battery scenarios (power fixed at "
-      f"{BATTERY_POWER_MW / 1000:.1f} GW = 30% of average demand):")
-for label, duration_h in BATTERY_SCENARIOS.items():
-    cap_gwh = BATTERY_POWER_MW * duration_h / 1000
-    print(f"  {label:24s}  {duration_h:5.0f} h   {cap_gwh:8,.0f} GWh")
-
 # %% [markdown]
-# ## Average renewable share and curtailment vs. buildout
+# ### Where the extra energy goes, at one buildout level (2x)
 #
-# Left: share of demand covered on average by RE + battery (`1 - average
-# residual load / average demand`). Right: share of *produced* RE energy
-# that ends up curtailed. Same x-axis, same battery-scenario colors.
+# Same stacked picture as section 1, one column per battery size, holding
+# buildout fixed at 2x (the level where section 1 showed batteries have the
+# most surplus available to work with). Direct use never changes -- only
+# how the *rest* gets split between delivered-later (green), still curtailed
+# (red), and still-residual (gray).
 
 # %%
-fig, (ax_share, ax_curt) = plt.subplots(1, 2, figsize=(13, 5.5), sharex=True)
+DEMO_MULTIPLIER = 2.0
 
+decomposition_rows = []
+for label, duration_h in BATTERY_SCENARIOS.items():
+    r = simulate(DEMO_MULTIPLIER, duration_h)
+    decomposition_rows.append({
+        "battery": label,
+        "direct_gw": r["direct"].mean() / 1000,
+        "delivered_gw": r["delivered"].mean() / 1000,
+        "curtailed_gw": r["curtailed"].mean() / 1000,
+        "residual_gw": r["residual"].mean() / 1000,
+    })
+decomposition = pd.DataFrame(decomposition_rows)
+print(f"Decomposition at {DEMO_MULTIPLIER:g}x buildout (GW, averaged over ~7 years):")
+print(decomposition.to_string(index=False))
+
+fig, ax = plt.subplots(figsize=(8, 6))
+x = np.arange(len(decomposition))
+width = 0.55
+
+bottom = np.zeros(len(decomposition))
+for col, color, label in [
+    ("direct_gw", DIRECT_COLOR, "Direct RE use"),
+    ("delivered_gw", DELIVERED_COLOR, "Delivered via battery"),
+    ("residual_gw", RESIDUAL_COLOR, "Residual load (gas/import)"),
+]:
+    ax.bar(x, decomposition[col], width, bottom=bottom, color=color, label=label)
+    bottom += decomposition[col].values
+ax.bar(x, decomposition["curtailed_gw"], width, bottom=bottom, color=CURTAILED_COLOR, alpha=0.75, label="Still curtailed (wasted)")
+
+ax.axhline(avg_demand_mw / 1000, color="#0b0b0b", linewidth=1, linestyle="--", zorder=0)
+ax.set_xticks(x)
+ax.set_xticklabels(decomposition["battery"])
+ax.set_xlabel("Battery size")
+ax.set_ylabel("Average power [GW]")
+ax.set_title(f"Storage's marginal value at {DEMO_MULTIPLIER:g}x buildout")
+ax.yaxis.grid(True, linewidth=0.4, alpha=0.6)
+ax.set_axisbelow(True)
+ax.legend(fontsize=9, loc="upper left")
+fig.tight_layout()
+plt.show()
+
+# %% [markdown]
+# At 2x buildout, the biggest battery tested (168h, 9.3 TWh -- about a
+# week's worth of *all of Germany's* average demand) still only delivers
+# ~10 GW on average, cutting curtailment from 22 GW down to 10 GW and
+# residual load from 11 GW down to under 1 GW. It helps a lot, but it takes
+# an enormous reservoir to get there, and even that doesn't zero either one
+# out at this buildout level.
+
+# %% [markdown]
+# ### Does storage's marginal value hold up across the whole buildout range?
+
+# %%
+delivered_rows = []
+for multiplier in MULTIPLIERS:
+    row = {"multiplier": multiplier}
+    for label, duration_h in BATTERY_SCENARIOS.items():
+        if duration_h == 0:
+            continue
+        row[label] = simulate(multiplier, duration_h)["delivered"].mean() / 1000
+    delivered_rows.append(row)
+delivered_df = pd.DataFrame(delivered_rows)
+
+fig, ax = plt.subplots(figsize=(9, 5.5))
+for label in ["4h battery", "24h battery", "168h battery"]:
+    ax.plot(delivered_df["multiplier"], delivered_df[label], marker="o", markersize=4,
+            linewidth=1.8, color=BATTERY_COLORS[label], label=label)
+ax.set_xlabel("RE buildout multiplier (x today's fleet)")
+ax.set_ylabel("Average energy delivered from storage [GW]")
+ax.set_title("Storage's average contribution peaks, then fades")
+ax.yaxis.grid(True, linewidth=0.4, alpha=0.6)
+ax.set_axisbelow(True)
+ax.legend(fontsize=9, loc="upper right")
+fig.tight_layout()
+plt.show()
+
+# %% [markdown]
+# Every battery size follows the same hump: at low buildout there's little
+# surplus around to capture in the first place, so storage has little to
+# work with; at high buildout, residual load is already so small that
+# there's little left for storage to usefully fill. The 168h battery's
+# average contribution peaks around 2x buildout (~10 GW) and fades on both
+# sides -- a battery's usefulness is tied to *how imbalanced* generation and
+# demand are, not to its own size alone.
+
+# %% [markdown]
+# ## Average renewable share and curtailment, with batteries
+#
+# Same two-panel view as section 1, now split by battery scenario: average
+# RE + battery share of demand (`1 - average residual / average demand`),
+# and the share of *produced* RE that still ends up curtailed.
+
+# %%
+share_rows = []
+for multiplier in MULTIPLIERS:
+    for label, duration_h in BATTERY_SCENARIOS.items():
+        r = simulate(multiplier, duration_h)
+        share_rows.append({
+            "multiplier": multiplier,
+            "battery": label,
+            "avg_re_share": 1 - r["residual"].mean() / avg_demand_mw,
+            "curtailment_share": r["curtailed"].sum() / r["gen"].sum(),
+            "peak_residual_frac": r["residual"].max() / avg_demand_mw,
+            "battery_capacity_twh": duration_h * avg_demand_mw / 1e6,
+        })
+results = pd.DataFrame(share_rows)
+
+fig, (ax_share, ax_curt) = plt.subplots(1, 2, figsize=(13, 5.5), sharex=True)
 for label in BATTERY_SCENARIOS:
     sub = results[results["battery"] == label].sort_values("multiplier")
     ax_share.plot(sub["multiplier"], sub["avg_re_share"] * 100, marker="o", markersize=4,
@@ -239,24 +406,25 @@ ax_share.legend(fontsize=8, loc="lower right")
 
 ax_curt.set_ylabel("Curtailed share of RE production [%]")
 ax_curt.set_xlabel("RE buildout multiplier (x today's fleet)")
-ax_curt.set_title("...and how much of it gets thrown away")
+ax_curt.set_title("...and how much of it still gets thrown away")
 ax_curt.yaxis.grid(True, linewidth=0.4, alpha=0.6)
 ax_curt.set_axisbelow(True)
 ax_curt.legend(fontsize=8, loc="upper left")
 
-fig.suptitle("Scaling up today's DE wind+solar mix: coverage vs. waste")
+fig.suptitle("Scaling up today's DE wind+solar mix: coverage vs. waste, with storage")
 fig.tight_layout()
 plt.show()
 
 # %% [markdown]
-# Two things happen at once as the buildout multiplier grows: the average RE
-# share climbs toward 100%, but so does curtailment -- because the same extra
-# capacity that fills winter gaps also massively overshoots on a windy summer
-# afternoon. A battery shifts that curve outward (less curtailment, or less
-# buildout, for the same average share) but doesn't change its shape. Getting
-# from ~90% to ~95% average share costs roughly as much extra buildout (and
-# curtailment) as getting from 0% to ~80% did -- steeply diminishing returns
-# past the "comparatively cheap" 90-95% band the introduction points at.
+# Batteries shift both curves outward -- less buildout (or less curtailment)
+# needed for the same average coverage -- but diminishing returns still set
+# in fast. For the 24h-battery line: going from 1x to 1.5x buildout buys
+# +24 percentage points of average share; 1.5x to 2x buys +11; 2x to 2.5x
+# only +3.4; 2.5x to 3x barely +1.4. With a 24h battery, ~94% average share
+# is already within reach at 2x buildout, and ~99% by 3x -- the no-battery
+# baseline needs 5x to even reach ~95%. Storage doesn't change the
+# diminishing-returns *shape*, but it moves the "comparatively cheap" 90-95%
+# band to a much more modest buildout level.
 
 # %% [markdown]
 # ## Peak residual load: the backup capacity question
@@ -278,7 +446,7 @@ ax.axhline(100, color="#898781", linewidth=1, linestyle="--", zorder=0)
 ax.text(MULTIPLIERS[-1], 100, " = average demand", color="#898781", fontsize=8, va="bottom", ha="right")
 ax.set_xlabel("RE buildout multiplier (x today's fleet)")
 ax.set_ylabel("Peak residual load [% of average demand]")
-ax.set_title("Worst-hour backup capacity barely shrinks")
+ax.set_title("Only a very large, power-unconstrained battery ever fully closes this")
 ax.yaxis.grid(True, linewidth=0.4, alpha=0.6)
 ax.set_axisbelow(True)
 ax.legend(fontsize=8, loc="lower left")
@@ -286,14 +454,14 @@ fig.tight_layout()
 plt.show()
 
 # %% [markdown]
-# The 4h and 24h batteries barely move this line at all -- too small to still
-# hold meaningful charge by the time a rare, extreme hour arrives. The 1-week
-# battery is the exception: once buildout is large enough to keep it
-# routinely topped up (~4x and up), it cuts the worst hour substantially,
-# from ~125% down to ~90-96% of average demand. But even that best case
-# doesn't get close to zero -- at 8x today's fleet, the single worst hour in
-# ~7 years *still* needs backup capacity equal to ~90% of average demand, a
-# conventional/import fleet that would sit idle nearly all year to cover it.
+# Each battery size eventually drives the peak to zero -- but only once
+# buildout is large enough, and "large enough" scales steeply with battery
+# size: the 168h/9.3 TWh reservoir gets there around 4x-5x buildout; the
+# 24h/1.3 TWh battery needs ~8x; the 4h/0.2 TWh battery never gets there in
+# this range at all. **Read the 168h/24h lines as a generous upper bound,
+# not a realistic one** -- a 9.3 TWh, power-unconstrained battery is
+# nowhere close to anything deployable today. The 4h line is closer to a
+# real (if still huge) grid battery, and it barely moves.
 
 # %% [markdown]
 # ## Does the worst multi-day shortfall ever go away?
@@ -301,7 +469,7 @@ plt.show()
 # Cumulative-balance drawdown (`54`'s "system drawdown" method): running sum
 # of curtailed-minus-residual energy, then the deepest peak-to-trough decline
 # -- the total energy a backup source would have had to supply across the
-# single worst sustained episode in ~7 years, in units of average-demand-days.
+# single worst sustained episode in ~7 years.
 #
 # **Caveat visible in the chart itself:** at 1.0x-1.5x buildout the system is
 # in *chronic* deficit (RE rarely exceeds demand at all), so the "episode"
@@ -310,16 +478,32 @@ plt.show()
 # and are shown for continuity, not as a comparable Dunkelflaute figure.
 
 # %%
+def worst_drawdown_days(curtailed: np.ndarray, residual: np.ndarray) -> float:
+    balance = np.cumsum(curtailed - residual)
+    running_max = np.maximum.accumulate(balance)
+    trough_idx = int(np.argmin(balance - running_max))
+    magnitude_mwh = running_max[trough_idx] - balance[trough_idx]
+    return magnitude_mwh / avg_demand_mw / 24
+
+
+drawdown_rows = []
+for multiplier in MULTIPLIERS:
+    row = {"multiplier": multiplier}
+    for label, duration_h in BATTERY_SCENARIOS.items():
+        r = simulate(multiplier, duration_h)
+        row[label] = worst_drawdown_days(r["curtailed"], r["residual"])
+    drawdown_rows.append(row)
+drawdown_df = pd.DataFrame(drawdown_rows)
+
 fig, ax = plt.subplots(figsize=(9, 5.5))
 for label in BATTERY_SCENARIOS:
-    sub = results[results["battery"] == label].sort_values("multiplier")
-    ax.plot(sub["multiplier"], sub["worst_drawdown_demand_days"], marker="o", markersize=4,
+    ax.plot(drawdown_df["multiplier"], drawdown_df[label], marker="o", markersize=4,
             linewidth=1.8, color=BATTERY_COLORS[label], label=label)
 
 ax.set_yscale("log")
 ax.set_xlabel("RE buildout multiplier (x today's fleet)")
 ax.set_ylabel("Worst episode's cumulative shortfall\n[days of average demand, log scale]")
-ax.set_title("Overbuilding shrinks the worst-case gap fast, then very slowly")
+ax.set_title("Same pattern: big enough storage closes it, but needs a lot of buildout too")
 ax.yaxis.grid(True, which="both", linewidth=0.4, alpha=0.5)
 ax.set_axisbelow(True)
 ax.legend(fontsize=8, loc="lower left")
@@ -328,52 +512,70 @@ plt.show()
 
 # %%
 demand_day_twh = avg_demand_mw * 24 / 1e6
-for multiplier in [2.0, 3.0, 8.0]:
-    no_battery = results[(results["multiplier"] == multiplier) & (results["battery"] == "No battery")].iloc[0]
-    with_168h = results[(results["multiplier"] == multiplier) & (results["battery"] == "168h battery (1 week)")].iloc[0]
-    print(f"{multiplier:.0f}x buildout: worst episode = {no_battery['worst_drawdown_demand_days'] * demand_day_twh:.1f} TWh "
-          f"(no battery) / {with_168h['worst_drawdown_demand_days'] * demand_day_twh:.1f} TWh (168h battery) "
-          f"-- vs. the battery's own {BATTERY_POWER_MW * 168 / 1e6:.1f} TWh capacity")
+print("Worst episode, no battery vs. 168h battery (TWh), vs. that battery's own 9.3 TWh capacity:")
+for multiplier in [1.0, 2.0, 3.0, 4.0]:
+    no_bat = drawdown_df.loc[drawdown_df["multiplier"] == multiplier, "No battery"].iloc[0]
+    big_bat = drawdown_df.loc[drawdown_df["multiplier"] == multiplier, "168h battery"].iloc[0]
+    print(f"  {multiplier:.0f}x: {no_bat * demand_day_twh:6.1f} TWh (no battery)  ->  {big_bat * demand_day_twh:5.2f} TWh (168h battery)")
 
 # %% [markdown]
-# Once buildout is large enough that the chronic deficit disappears (roughly
-# 2x today's fleet), the worst-episode metric drops fast, then flattens: going
-# from 4x to 8x buildout -- doubling an already enormous fleet again -- only
-# takes the worst episode from a few days' worth of average demand to about a
-# day's worth. Batteries help here, but less than buildout does, and for a
-# reason worth separating: at 2x buildout the worst episode (~21 TWh) dwarfs
-# even the enormous 168h/~2.8 TWh battery, so it barely dents it (~2%) --
-# genuinely a capacity-insufficiency story. By 8x buildout the episode itself
-# has shrunk to well *below* the battery's own capacity, yet the battery still
-# only cuts it by roughly half, not to zero -- at that point it's no longer
-# about total capacity but about *timing*: the battery isn't necessarily full
-# when the drought begins, and its fixed power rating limits how fast it can
-# charge beforehand or discharge during it. Either way, across the whole
-# range tested, buildout moves this line by orders of magnitude while battery
-# duration -- even pushed to an unrealistic week's worth -- moves it by at
-# most a factor of ~2.
+# At 2x buildout the underlying gap (20.8 TWh, no battery) is still more
+# than double the 168h battery's own 9.3 TWh capacity -- it can only chip
+# ~7 TWh off, leaving 13.5 TWh unclosed. At 3x, the gap has shrunk to 9.3
+# TWh (no battery) -- almost exactly the battery's own size -- and it closes
+# all but 0.6 TWh of it. By 4x, the remaining gap (3.9 TWh, no battery) is
+# comfortably smaller than the battery, which duly drives it to zero. That
+# progression *is* the capacity-sufficiency story: a battery only closes a
+# gap once it's roughly as large as the gap itself. The smaller, more
+# realistic sizes (4h: 0.2 TWh, 24h: 1.3 TWh) never get there in this range
+# -- their capacity stays far below what even a moderately built-out
+# system's worst episode demands.
 
 # %% [markdown]
-# ## What the residual-load curve looks like at three scenarios
+# ## A closer look at one near-ideal case
 #
-# Same three ingredients (buildout, battery), but instead of one summary
-# number per scenario: every hour's residual load, sorted descending, as a
-# share of average demand. This is the shape a duration-curve/backup-fleet
-# planner actually cares about -- not just the headline average.
+# At 3x buildout with the 168h/9.3 TWh battery, average RE share is already
+# ~100% and curtailment ~43% (see the two-panel chart above) -- about as
+# good as this lever combination gets in the tested range.
+
+# %%
+near_ideal = simulate(3.0, 168.0)
+nonzero_hours = int((near_ideal["residual"] > 1e-6).sum())
+total_hours = len(near_ideal["residual"])
+print(f"Hours with any residual load at all: {nonzero_hours} of {total_hours:,} ({nonzero_hours / total_hours:.3%})")
+print(f"Worst of those hours: {near_ideal['residual'].max() / 1000:.1f} GW "
+      f"({near_ideal['residual'].max() / avg_demand_mw:.0%} of average demand)")
+
+# %% [markdown]
+# Only 24 hours in ~7 years have *any* residual load at all under this
+# near-ideal setup -- and the worst of those 24 still needs ~51 GW, close to
+# average demand itself. That's the sharpest version of the point: even a
+# scenario that is, on paper, essentially fully renewable still needs a
+# backup fleet sized for near-total replacement, just used for a handful of
+# hours a decade instead of routinely.
+
+# %% [markdown]
+# ## Residual-load duration curve, holding battery size fixed at 24h
+#
+# Every hour's residual load, sorted descending, as a share of average
+# demand -- the shape a backup-fleet planner actually cares about, not just
+# the headline average. Buildout varies (1x/no-battery, 2x, 3x), battery
+# held at a constant, still-huge-but-not-absurd 24h/1.3 TWh, to isolate what
+# more buildout alone buys once storage is fixed.
 
 # %%
 SCENARIOS_TO_TRACE = [
     ("Today's fleet, no battery", 1.0, "No battery"),
-    ("~90% avg RE (2x fleet, 24h battery)", 2.0, "24h battery (1 day)"),
-    ("~96% avg RE (3x fleet, 1-week battery)", 3.0, "168h battery (1 week)"),
+    ("2x fleet, 24h battery", 2.0, "24h battery"),
+    ("3x fleet, 24h battery", 3.0, "24h battery"),
 ]
 TRACE_COLORS = ["#a9a8a2", "#3987e5", "#0d366b"]
 
 fig, ax = plt.subplots(figsize=(9, 5.5))
 for (label, multiplier, battery_label), color in zip(SCENARIOS_TO_TRACE, TRACE_COLORS):
     duration_h = BATTERY_SCENARIOS[battery_label]
-    _, residual, _ = simulate(multiplier, duration_h)
-    sorted_residual = np.sort(residual)[::-1] / avg_demand_mw * 100
+    r = simulate(multiplier, duration_h)
+    sorted_residual = np.sort(r["residual"])[::-1] / avg_demand_mw * 100
     hours_pct = np.arange(1, len(sorted_residual) + 1) / len(sorted_residual) * 100
     ax.plot(hours_pct, sorted_residual, linewidth=1.8, color=color, label=label)
 
@@ -389,16 +591,13 @@ fig.tight_layout()
 plt.show()
 
 # %% [markdown]
-# The high-RE curve (dark blue) hugs zero for most of the distribution --
-# the median hour has *no* residual load at all, vs. ~46% of average demand
-# for today's baseline. That's what a 96%-average-share number promises. But
-# the gap closes fast heading left: in the worst 0.1% of hours (~63 of them,
-# across ~7 years), the high-RE scenario is still at ~81% of average demand
-# vs. the baseline's ~121% -- a real improvement, but nowhere near the ~100%
-# reduction seen at the median. Buildout and storage compress the *bulk* of
-# the distribution far more effectively than they compress the *tail* --
-# which is exactly the Dunkelflaute sliver, and the reason backup capacity
-# can't be sized off the average.
+# Going from 2x to 3x buildout (same 24h battery both times) shrinks the
+# share of hours with *any* residual load at all from 11.5% down to 2.9% --
+# a big win across most of the distribution. But the very top of the curve
+# barely moves: the single worst hour sits at 132% of average demand at 2x
+# and still 129% at 3x, and the worst 0.1% of hours is ~113% vs. ~102%.
+# Buildout keeps paying off across almost the whole distribution, long after
+# it's stopped moving the peak.
 
 # %% [markdown]
 # ## Summary: four scenarios side by side
@@ -406,23 +605,27 @@ plt.show()
 # %%
 NAMED_SCENARIOS = [
     ("Today's fleet", 1.0, "No battery"),
-    ("~90% avg RE, with 24h battery", 2.0, "24h battery (1 day)"),
-    ("~95% avg RE, with 1-week battery", 3.0, "168h battery (1 week)"),
+    ("~94% avg RE, with 24h battery", 2.0, "24h battery"),
+    ("~100% avg RE, with 168h battery", 3.0, "168h battery"),
     ("~95% avg RE, no battery at all", 5.0, "No battery"),
 ]
 
 summary_rows = []
 for label, multiplier, battery_label in NAMED_SCENARIOS:
-    row = results[(results["multiplier"] == multiplier) & (results["battery"] == battery_label)].iloc[0]
+    duration_h = BATTERY_SCENARIOS[battery_label]
+    r = simulate(multiplier, duration_h)
+    avg_re_share = 1 - r["residual"].mean() / avg_demand_mw
+    curtailment_share = r["curtailed"].sum() / r["gen"].sum()
+    peak_residual = r["residual"].max() / avg_demand_mw
+    worst_episode = worst_drawdown_days(r["curtailed"], r["residual"])
     summary_rows.append({
         "scenario": label,
         "buildout": f"{multiplier:.1f}x ({multiplier * total_current_gw:,.0f} GW)",
-        "battery": battery_label,
-        "battery_gwh": f"{row['battery_capacity_gwh']:,.0f}",
-        "avg_re_share": f"{row['avg_re_share']:.0%}",
-        "curtailed": f"{row['curtailment_share']:.0%}",
-        "peak_residual": f"{row['peak_residual_frac']:.0%} of avg demand",
-        "worst_episode": f"{row['worst_drawdown_demand_days']:.1f} demand-days",
+        "battery": f"{battery_label} ({duration_h * avg_demand_mw / 1e6:.2f} TWh)" if duration_h else battery_label,
+        "avg_re_share": f"{avg_re_share:.0%}",
+        "curtailed": f"{curtailment_share:.0%}",
+        "peak_residual": f"{peak_residual:.0%} of avg demand",
+        "worst_episode": f"{worst_episode:.1f} demand-days",
     })
 
 summary = pd.DataFrame(summary_rows).set_index("scenario")
@@ -432,23 +635,25 @@ print(summary.to_string())
 # ## Takeaways
 #
 # - **The first ~90-95% of average renewable share is comparatively cheap.**
-#   Roughly doubling today's wind+solar fleet, paired with a modest (24h)
-#   battery, gets ~90% of demand covered on average with "only" ~25-30%
-#   curtailment of RE production.
-# - **Chasing the last few percent is much more expensive, with or without a
-#   battery.** Reaching ~95% average share needs either a much bigger battery
-#   on top of 3x buildout, or ~5x buildout with no battery at all and ~65-70%
-#   of RE production thrown away -- the curtailment cost of skipping storage
-#   entirely is severe, confirming the "you'd have to massively overbuild
-#   *and* waste most of it" intuition.
-# - **Neither lever comes close to closing the Dunkelflaute tail, even at
-#   absurd scale.** A realistic-sized battery (4h-24h) barely moves the
-#   worst-hour or worst-episode numbers at all. Even the enormous 168h/~2.8
-#   TWh scenario -- far beyond anything plausibly deployable -- only ever
-#   trims them by a third to a half; it never gets close to zero, because
-#   backup need is set by a specific windless, sunless multi-day stretch that
-#   buildout doesn't fill and that no battery this size is reliably full for
-#   when it hits. A 90-95% average share is a *buildout/storage* problem with
-#   a comparatively good cost-benefit ratio; the remaining sliver is a
-#   *backup capacity* problem that scaling the same two levers further
-#   doesn't solve.
+#   Roughly doubling today's wind+solar fleet, paired with a large-but-not-
+#   absurd (24h) battery, gets ~94% of demand covered on average with
+#   "only" ~20% curtailment of RE production.
+# - **A battery's marginal value has a sweet spot, not a straight line.** It
+#   peaks around 2x buildout (where there's both meaningful surplus to
+#   capture and meaningful deficit to fill) and fades at both extremes --
+#   sizing storage only makes sense relative to a given buildout level, not
+#   in isolation.
+# - **Only an unrealistically large, power-unconstrained battery ever fully
+#   closes the Dunkelflaute tail -- and even then, only once buildout is
+#   already very large.** The 168h/9.3 TWh scenario (about a week of the
+#   *entire country's* average demand, with no charge/discharge rate limit
+#   at all) eventually drives peak residual load and the worst multi-day
+#   shortfall to zero, but not before ~4x-5x buildout. Realistic sizes (4h,
+#   24h) never get there in the range tested here.
+# - **Even the best case studied still needs full backup capacity, just
+#   rarely.** At 3x buildout with the 168h battery, only 24 of ~63,500 hours
+#   have any residual load at all -- but the worst of those 24 still needs
+#   backup close to average demand. A 90-95% average share is a
+#   buildout/storage problem with a good cost-benefit ratio; the remaining
+#   sliver is a backup-*capacity* problem, still there even when the backup-
+#   *energy* problem has essentially been solved.
