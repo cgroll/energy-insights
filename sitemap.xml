@@ -19,4 +19,7 @@
   <url>
     <loc>http://localhost:3000/notebooks/pecd-simple-vs-mastr-weighted</loc>
   </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/ttf-gas-vs-power-price</loc>
+  </url>
 </urlset>
