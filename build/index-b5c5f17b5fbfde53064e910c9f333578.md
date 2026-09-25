@@ -51,6 +51,12 @@ reviewed against the new numbers.
   really fallen over time as the cannibalization hypothesis predicts: it has,
   roughly halving since 2019, and tracks installed PV capacity (r = -0.88)
   more tightly than it tracks calendar time alone.
+- **Day-ahead price shape** — is the daily price curve really turning
+  two-humped, as battery-arbitrage folklore has it? Daily/monthly/annual
+  min-max spread (roughly quadrupled since 2019), then the average hourly
+  shape by season and year: summer goes from one shallow midday hump to a
+  deep two-peaked valley, winter stays one-humped throughout — the shape
+  change tracks PV output, not the calendar.
 
 ## Roadmap
 

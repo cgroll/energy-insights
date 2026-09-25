@@ -31,4 +31,7 @@
   <url>
     <loc>http://localhost:3000/notebooks/pv-capture-rate</loc>
   </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/price-bimodality</loc>
+  </url>
 </urlset>
