@@ -33,6 +33,9 @@ project:
     - title: Solar capture rate
       children:
         - file: notebooks/10_pv_capture_rate.ipynb
+    - title: Day-ahead price shape
+      children:
+        - file: notebooks/11_price_bimodality.ipynb
 site:
   options:
     folders: true

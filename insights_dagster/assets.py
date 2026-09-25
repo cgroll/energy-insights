@@ -215,6 +215,25 @@ def page_pv_capture_rate(context: AssetExecutionContext) -> None:
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
+@asset(
+    name="page_price_bimodality",
+    deps=["smard_price_de_lu"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "Checks the battery-arbitrage-relevant claim that the day-ahead price's daily shape is turning "
+        "two-humped: daily/monthly/annual min-max spread (roughly quadrupled since 2019), then the average "
+        "hourly price shape by season and year (gradient-colored by recency) -- summer goes from one shallow "
+        "midday hump to a deep two-peaked valley, winter stays one-humped throughout, tying the shape change "
+        "to PV output rather than to calendar time alone."
+    ),
+)
+def page_price_bimodality(context: AssetExecutionContext) -> None:
+    output_file = _run_page("11_price_bimodality.py", "11_price_bimodality.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
 page_assets = [
     page_mastr_capacity_de,
     page_mastr_vs_smard_capacity,
@@ -225,4 +244,5 @@ page_assets = [
     page_pecd_country_comparison,
     page_re_buildout_battery_residual_load,
     page_pv_capture_rate,
+    page_price_bimodality,
 ]
