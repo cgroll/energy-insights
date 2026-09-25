@@ -30,14 +30,17 @@
 # and mixing the two seasons would just wash it out.
 
 # %%
+import io
+
 import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from PIL import Image
 
-from insights.paths import hub_file
+from insights.paths import INSIGHTS_ROOT, hub_file
 
 MIN_COLOR = "#2a78d6"     # dataviz skill categorical slot 1 (blue) -- cool = daily low
 MAX_COLOR = "#eb6834"     # dataviz skill categorical slot 2 (orange) -- warm = daily high
@@ -214,3 +217,97 @@ plt.show()
 # first place, there's no mechanism here to split the peak. That contrast
 # is itself the check on the hypothesis: the shape change tracks the
 # season where PV actually produces, not the calendar in general.
+
+# %% [markdown]
+# ## Same shapes, with the price level taken out
+#
+# The chart above mixes two things at once: the overall price *level*,
+# which varies enormously year to year (2022's crisis alone dwarfs the
+# 2019-2021 lines), and the intraday *shape*, which is what this page is
+# actually about. Subtracting each year's own average price from its curve
+# removes the level and leaves only the shape -- every line is centered on
+# zero, so a 2019 curve and a 2026 curve sit on directly comparable footing
+# regardless of how far apart their price levels were.
+
+# %%
+summer_demeaned = summer_curves.sub(summer_curves.mean(axis=1), axis=0)
+winter_demeaned = winter_curves.sub(winter_curves.mean(axis=1), axis=0)
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), sharey=True)
+plot_seasonal_curves(axes[0], summer_demeaned, SUMMER_CMAP, "Summer (Jun-Aug)")
+plot_seasonal_curves(axes[1], winter_demeaned, WINTER_CMAP, "Winter (Dec-Feb)")
+for ax in axes:
+    ax.axhline(0, color="#9a9990", linewidth=1)
+axes[0].set_ylabel("Deviation from that year's average price (EUR/MWh)")
+fig.suptitle("Average daily price shape, demeaned per year")
+fig.tight_layout()
+plt.show()
+
+# %% [markdown]
+# With the level stripped out, the summer amplitude growth is even more
+# striking: the peak-to-trough swing around each year's own average goes
+# from ~20 EUR/MWh in 2019-2020 to ~130-175 EUR/MWh in 2024-2026 (2022, the
+# crisis year, is its own outlier at ~210, driven by volatility rather than
+# a structurally deeper trough). Winter's swing grows too, but far more
+# mildly -- roughly 25-30 EUR/MWh in 2019-2021 to 45-80 EUR/MWh since,
+# without a clean upward trend, and largely tracking the 2022/2023 crisis
+# rather than a steady structural shift. Demeaning doesn't change the
+# conclusion, it sharpens it: summer's *relative* daily swing has grown
+# several times over, winter's has barely moved.
+
+# %% [markdown]
+# ## Watching the shape emerge, year by year
+#
+# Same demeaned curves, animated: one year added per frame, prior years left
+# in as a light grey trace behind it, so the progression is visible frame by
+# frame rather than needing to be read out of eight overlaid lines at once.
+# Both panels share one fixed y-axis across every frame (set from the
+# global min/max across all years) so the growing amplitude is a genuine
+# visual change, not an axis rescale.
+
+# %%
+YLIM = 130  # covers the global demeaned min/max across both panels with a small margin
+
+frames = []
+for i, year in enumerate(summer_curves.index):
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), sharey=True)
+
+    for j in range(i):
+        prior_year = summer_curves.index[j]
+        axes[0].plot(summer_demeaned.columns, summer_demeaned.loc[prior_year], color="#c9c7c0", linewidth=1.3, alpha=0.7, zorder=1)
+        axes[1].plot(winter_demeaned.columns, winter_demeaned.loc[prior_year], color="#c9c7c0", linewidth=1.3, alpha=0.7, zorder=1)
+
+    axes[0].plot(summer_demeaned.columns, summer_demeaned.loc[year], color=mpl.colormaps[SUMMER_CMAP](0.75), linewidth=2.5, zorder=2)
+    axes[1].plot(winter_demeaned.columns, winter_demeaned.loc[year], color=mpl.colormaps[WINTER_CMAP](0.75), linewidth=2.5, zorder=2)
+
+    for ax, title in zip(axes, ["Summer (Jun-Aug)", "Winter (Dec-Feb)"]):
+        ax.axhline(0, color="#9a9990", linewidth=1)
+        ax.set_xlabel("Hour of day")
+        ax.set_xticks([0, 6, 12, 18, 23])
+        ax.set_ylim(-YLIM, YLIM)
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.set_title(title)
+    axes[0].set_ylabel("Deviation from that year's average price (EUR/MWh)")
+    fig.suptitle(f"Average daily price shape, demeaned -- {year}")
+    fig.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=100, bbox_inches="tight")
+    plt.close(fig)
+    buf.seek(0)
+    frames.append(Image.open(buf).convert("RGB"))
+
+# Saved next to where the executed notebook lands -- anchored via
+# INSIGHTS_ROOT rather than a relative path, same reasoning as
+# `01_mastr_capacity_de`'s capacity_map_animation.gif (jupytext executes
+# with cwd relative to the source file in pages/, not the repo root).
+gif_path = INSIGHTS_ROOT / "book" / "notebooks" / "price_shape_animation.gif"
+frames[0].save(gif_path, save_all=True, append_images=frames[1:], duration=700, loop=0)
+print(f"Saved {len(frames)}-frame animation -> {gif_path}")
+
+# %% [markdown]
+# ```{figure} price_shape_animation.gif
+# :name: fig-price-shape-animation
+# Average daily price shape (demeaned), summer and winter side by side,
+# animated year by year with prior years left in as a grey trace.
+# ```

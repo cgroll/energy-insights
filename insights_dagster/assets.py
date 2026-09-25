@@ -224,9 +224,10 @@ def page_pv_capture_rate(context: AssetExecutionContext) -> None:
     description=(
         "Checks the battery-arbitrage-relevant claim that the day-ahead price's daily shape is turning "
         "two-humped: daily/monthly/annual min-max spread (roughly quadrupled since 2019), then the average "
-        "hourly price shape by season and year (gradient-colored by recency) -- summer goes from one shallow "
-        "midday hump to a deep two-peaked valley, winter stays one-humped throughout, tying the shape change "
-        "to PV output rather than to calendar time alone."
+        "hourly price shape by season and year (gradient-colored by recency, then demeaned per year for a "
+        "level-independent comparison, then animated) -- summer goes from one shallow midday hump to a deep "
+        "two-peaked valley, winter stays one-humped throughout, tying the shape change to PV output rather "
+        "than to calendar time alone."
     ),
 )
 def page_price_bimodality(context: AssetExecutionContext) -> None:
