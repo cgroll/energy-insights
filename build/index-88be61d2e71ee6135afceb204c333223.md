@@ -47,6 +47,10 @@ reviewed against the new numbers.
   real hourly demand: how much of demand gets covered on average, how much
   gets curtailed, and whether either lever actually closes the Dunkelflaute
   tail (it doesn't).
+- **Solar capture rate** — checks whether PV's day-ahead capture rate has
+  really fallen over time as the cannibalization hypothesis predicts: it has,
+  roughly halving since 2019, and tracks installed PV capacity (r = -0.88)
+  more tightly than it tracks calendar time alone.
 
 ## Roadmap
 

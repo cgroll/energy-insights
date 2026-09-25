@@ -28,4 +28,7 @@
   <url>
     <loc>http://localhost:3000/notebooks/re-buildout-battery-residual-load</loc>
   </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/pv-capture-rate</loc>
+  </url>
 </urlset>
