@@ -30,6 +30,9 @@ project:
     - title: RE buildout + battery storage
       children:
         - file: notebooks/09_re_buildout_battery_residual_load.ipynb
+    - title: Solar capture rate
+      children:
+        - file: notebooks/10_pv_capture_rate.ipynb
 site:
   options:
     folders: true

@@ -196,6 +196,25 @@ def page_re_buildout_battery_residual_load(context: AssetExecutionContext) -> No
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
+@asset(
+    name="page_pv_capture_rate",
+    deps=["smard_price_de_lu", "smard_generation_solar", "smard_capacity_solar"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "Solar's day-ahead capture rate (volume-weighted captured price / baseload average price) for "
+        "Germany, monthly and annual: a widening capture-price-vs-baseload gap, the annual downtrend "
+        "(-6 pp/year since 2019), and a direct correlation against SMARD's own installed PV capacity "
+        "(r = -0.88) -- checking the cannibalization hypothesis that PV's own buildout depresses the price "
+        "it captures."
+    ),
+)
+def page_pv_capture_rate(context: AssetExecutionContext) -> None:
+    output_file = _run_page("10_pv_capture_rate.py", "10_pv_capture_rate.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
 page_assets = [
     page_mastr_capacity_de,
     page_mastr_vs_smard_capacity,
@@ -205,4 +224,5 @@ page_assets = [
     page_ttf_gas_vs_power_price,
     page_pecd_country_comparison,
     page_re_buildout_battery_residual_load,
+    page_pv_capture_rate,
 ]
