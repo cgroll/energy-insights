@@ -36,6 +36,9 @@ project:
     - title: Day-ahead price shape
       children:
         - file: notebooks/11_price_bimodality.ipynb
+    - title: PECD vs. real plant-level generation (Kelmarsh, UK)
+      children:
+        - file: notebooks/12_kelmarsh_vs_pecd.ipynb
 site:
   options:
     folders: true
