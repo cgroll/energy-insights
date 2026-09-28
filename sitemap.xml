@@ -34,4 +34,7 @@
   <url>
     <loc>http://localhost:3000/notebooks/price-bimodality</loc>
   </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/kelmarsh-vs-pecd</loc>
+  </url>
 </urlset>
