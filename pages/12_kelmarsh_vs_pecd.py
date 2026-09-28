@@ -131,6 +131,25 @@ plt.show()
 # maintenance event.
 
 # %% [markdown]
+# ## Weekly availability over time
+#
+# `hourly_availability` resampled to a weekly mean -- not the raw
+# 10-minute flag, which is too noisy hour-to-hour to read as a trend.
+# This is where the pre-commissioning period and the October 2018 outage
+# actually show up as availability, rather than just being inferred from
+# the generation-vs-PECD gap above.
+
+# %%
+weekly_availability = hourly_availability.resample("W").mean()
+
+fig, ax = plt.subplots(figsize=(14, 3.5))
+ax.plot(weekly_availability.index, weekly_availability * 100, linewidth=1)
+ax.set_ylabel("Availability (%)")
+ax.set_ylim(0, 100)
+ax.set_title("Kelmarsh: weekly-mean availability over time")
+plt.show()
+
+# %% [markdown]
 # ## Monthly-mean scatter: raw PECD vs. availability-adjusted PECD
 
 # %%
@@ -157,6 +176,53 @@ ax.set_ylabel("Kelmarsh actual MW (monthly mean)")
 ax.set_title(f"Raw r={corr:.2f} vs. availability-adjusted r={corr_adj:.2f}")
 ax.legend()
 plt.show()
+
+# %% [markdown]
+# ## Hourly scatter: availability-adjusted PECD vs. actual
+#
+# The monthly-mean view above averages away a lot of hour-to-hour noise.
+# This checks the same availability-adjusted PECD series at its native
+# hourly resolution: correlation, mean absolute error (MAE, in MW), and
+# normalized MAE (MAE as a percentage of Kelmarsh's own mean hourly
+# output -- the same `nmae_pct` convention used in this book's
+# `04_pecd_potential_vs_smard_observed` page).
+
+# %%
+hourly = comparison[["kelmarsh_actual_mw", "pecd_implied_mw_availability_adjusted"]].dropna()
+
+corr_hourly = hourly["kelmarsh_actual_mw"].corr(hourly["pecd_implied_mw_availability_adjusted"])
+err_hourly = hourly["pecd_implied_mw_availability_adjusted"] - hourly["kelmarsh_actual_mw"]
+mae_hourly = err_hourly.abs().mean()
+nmae_hourly_pct = mae_hourly / hourly["kelmarsh_actual_mw"].mean() * 100
+
+print(f"Hourly correlation:        {corr_hourly:.3f}")
+print(f"Hourly MAE:                {mae_hourly:.3f} MW")
+print(f"Hourly normalized MAE:     {nmae_hourly_pct:.1f}%")
+
+fig, ax = plt.subplots(figsize=(6, 6))
+ax.scatter(
+    hourly["pecd_implied_mw_availability_adjusted"],
+    hourly["kelmarsh_actual_mw"],
+    s=2,
+    alpha=0.1,
+    rasterized=True,
+)
+lims = [0, installed_capacity_mw]
+ax.plot(lims, lims, "k--", linewidth=1, label="1:1")
+ax.set_xlabel("PECD-implied MW, availability-adjusted (hourly)")
+ax.set_ylabel("Kelmarsh actual MW (hourly)")
+ax.set_title(f"Hourly: r={corr_hourly:.2f}, MAE={mae_hourly:.2f} MW, NMAE={nmae_hourly_pct:.1f}%")
+ax.legend()
+plt.show()
+
+# %% [markdown]
+# As expected, the hourly cloud is far noisier than the monthly-mean
+# scatter above -- individual hours carry real short-term variability
+# (wind gusts, ramp events, sub-hourly curtailment) that both a monthly
+# average and the coarse hourly availability correction smooth over.
+# The correlation and NMAE here are the more honest, harder-to-game
+# numbers for "how good is this at hourly resolution", as opposed to the
+# monthly view's more favorable r=0.96.
 
 # %% [markdown]
 # ## Takeaways
