@@ -688,6 +688,7 @@ dependencies = [
     { name = "pillow" },
     { name = "pyarrow" },
     { name = "shapely" },
+    { name = "windpowerlib" },
     { name = "xarray" },
 ]
 
@@ -708,6 +709,7 @@ requires-dist = [
     { name = "pillow", specifier = ">=10.0.0" },
     { name = "pyarrow", specifier = ">=17.0.0" },
     { name = "shapely", specifier = ">=2.0.0" },
+    { name = "windpowerlib", specifier = ">=0.2.2" },
     { name = "xarray", specifier = ">=2024.9.0" },
 ]
 
@@ -2781,6 +2783,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d5/a0/8fd707bcb776a7be556bad06a2ea5fb9bd519df78ef8e26f70ccf0f38bff/webencodings-0.6.1.tar.gz", hash = "sha256:565f9ad031c702dae404e27a099e3e09186a3ab1b9520f06d215502b651fd910", size = 15001, upload-time = "2026-08-15T14:22:57.549Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/77/c6/040cbc72480d789a5f40d63fb484d3106554c4dfa2d2b70ad5022057750f/webencodings-0.6.1-py3-none-any.whl", hash = "sha256:7fab6269c8bf237c657876b52058ccb182e861518d1c695c1a9aaa8c1c105d5b", size = 8745, upload-time = "2026-08-15T14:22:56.31Z" },
+]
+
+[[package]]
+name = "windpowerlib"
+version = "0.2.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pandas" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a7/d4/a900a51ab869d94aca9f9d7f056c7ad7419aa639f48fcd0e481f5ef2a44a/windpowerlib-0.2.2.tar.gz", hash = "sha256:f61a31569c90fa97dab42bf81af6526d8d36eda3b56b4f9b1d5bdf126ae14224", size = 82206, upload-time = "2024-02-20T20:55:43.268Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ee/b8/cebae223832e7306e070a9285fd2a785bcd687cc6706f5ff280765f111b4/windpowerlib-0.2.2-py3-none-any.whl", hash = "sha256:0cc4ee1c0677c0b6a790149389f2f6713d0b7bb7b48db6a0e4ab6184d2369721", size = 74836, upload-time = "2024-02-20T20:55:40.006Z" },
 ]
 
 [[package]]

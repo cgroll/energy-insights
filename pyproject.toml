@@ -23,6 +23,7 @@ dependencies = [
     "xarray>=2024.9.0",
     "netcdf4>=1.7.0",
     "cartopy>=0.26.0",
+    "windpowerlib>=0.2.2",
 ]
 
 [build-system]

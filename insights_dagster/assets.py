@@ -254,6 +254,26 @@ def page_kelmarsh_vs_pecd(context: AssetExecutionContext) -> None:
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
+@asset(
+    name="page_kelmarsh_windspeed_reconstruction",
+    deps=["kelmarsh_turbine_scada", "kelmarsh_grid_meter", "kelmarsh_wt_static", "pecd_wind_onshore_europe_capacity_factors"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "Follow-up to page_kelmarsh_vs_pecd: does real per-turbine wind speed (through windpowerlib's real "
+        "MM92/2050 power curve) beat PECD's weather grid at hourly resolution? Yes, by a wide margin (NMAE "
+        "7.3% vs. 35.8%, both availability-adjusted) -- pointing at PECD's coarse weather input, not its "
+        "conversion formula, as the main hourly-scale error source. Also rules out a data-coverage artifact "
+        "in a density-adjusted wind speed variant, and quantifies a ~4% real-power ceiling (transformer/"
+        "house-load loss) no wind-speed model can beat. Prototyped in energy-research before being promoted."
+    ),
+)
+def page_kelmarsh_windspeed_reconstruction(context: AssetExecutionContext) -> None:
+    output_file = _run_page("13_kelmarsh_windspeed_reconstruction.py", "13_kelmarsh_windspeed_reconstruction.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
 page_assets = [
     page_mastr_capacity_de,
     page_mastr_vs_smard_capacity,
@@ -266,4 +286,5 @@ page_assets = [
     page_pv_capture_rate,
     page_price_bimodality,
     page_kelmarsh_vs_pecd,
+    page_kelmarsh_windspeed_reconstruction,
 ]

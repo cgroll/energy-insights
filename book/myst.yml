@@ -39,6 +39,7 @@ project:
     - title: PECD vs. real plant-level generation (Kelmarsh, UK)
       children:
         - file: notebooks/12_kelmarsh_vs_pecd.ipynb
+        - file: notebooks/13_kelmarsh_windspeed_reconstruction.ipynb
 site:
   options:
     folders: true
