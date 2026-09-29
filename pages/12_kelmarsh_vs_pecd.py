@@ -225,6 +225,74 @@ plt.show()
 # monthly view's more favorable r=0.96.
 
 # %% [markdown]
+# ## Correlation vs. aggregation level
+#
+# If the hourly scatter isn't a bug, it should be explainable as ordinary
+# high-frequency noise that gets averaged out at coarser resolutions.
+# Checked directly by resampling both series to increasingly coarse
+# windows before computing the correlation.
+
+# %%
+AGGREGATIONS = [
+    ("h", "hourly"),
+    ("3h", "3-hourly"),
+    ("6h", "6-hourly"),
+    ("D", "daily"),
+    ("W", "weekly"),
+    ("MS", "monthly"),
+]
+
+agg_labels = [label for _, label in AGGREGATIONS]
+corr_raw_by_agg = []
+corr_adj_by_agg = []
+for freq, _ in AGGREGATIONS:
+    r = comparison.resample(freq).mean().dropna()
+    corr_raw_by_agg.append(r["kelmarsh_actual_mw"].corr(r["pecd_implied_mw"]))
+    corr_adj_by_agg.append(r["kelmarsh_actual_mw"].corr(r["pecd_implied_mw_availability_adjusted"]))
+
+agg_corr = pd.DataFrame(
+    {"raw PECD": corr_raw_by_agg, "availability-adjusted PECD": corr_adj_by_agg}, index=agg_labels
+)
+print(agg_corr.round(3))
+
+fig, ax = plt.subplots(figsize=(8, 4.5))
+ax.plot(agg_corr.index, agg_corr["raw PECD"], marker="o", label="raw PECD")
+ax.plot(agg_corr.index, agg_corr["availability-adjusted PECD"], marker="o", label="availability-adjusted PECD")
+for x, y in zip(agg_corr.index, agg_corr["availability-adjusted PECD"]):
+    ax.annotate(f"{y:.3f}", (x, y), textcoords="offset points", xytext=(0, 8), ha="center", fontsize=8)
+ax.set_ylim(0.75, 1.0)
+ax.set_ylabel("Correlation vs. Kelmarsh actual MW")
+ax.set_title("Correlation rises steadily as high-frequency noise is averaged out")
+ax.legend()
+plt.show()
+
+# %% [markdown]
+# The steady, monotonic climb from hourly (0.86) to monthly (0.96) -- with
+# no jump or plateau at any particular step -- is exactly what averaging
+# out uncorrelated high-frequency noise looks like, and is a different
+# signature than a timestamp/timezone bug would leave (a real
+# off-by-some-hours error would show up as a step change once the
+# aggregation window becomes coarser than the offset, not this smooth
+# gradient). The gap is genuine physical noise -- PECD's single
+# ~28km-scale weather
+# grid cell is inherently smoother than one real farm's actual
+# gust-by-gust, wake-affected, occasionally-curtailed output. Confirmed
+# quantitatively too: the hour-to-hour change in Kelmarsh's actual output
+# has a standard deviation of 1.08 MW, vs. only 0.43 MW for the
+# availability-adjusted PECD series, despite both series having a similar
+# overall level of variation (std of the level itself: 3.27 vs. 2.93 MW).
+#
+# Note the **raw** PECD line isn't monotonic the same way -- it actually
+# dips at weekly/monthly. That's not a contradiction: raw PECD's error is
+# dominated by the two multi-week downtime periods (a *systematic* bias,
+# not noise), and at monthly resolution there are only 43 data points, so
+# those few heavily-biased months carry outsized leverage on the
+# correlation. Averaging helps precisely when the gap is noise, which is
+# why only the availability-adjusted line climbs cleanly -- once known
+# downtime is factored out, what's left really is high-frequency weather
+# noise that a longer averaging window legitimately smooths away.
+
+# %% [markdown]
 # ## Takeaways
 #
 # - PECD's onshore wind capacity factor for zone UK03, scaled by
@@ -244,3 +312,9 @@ plt.show()
 #   smaller sample than the national SMARD comparisons elsewhere in this
 #   book, but a genuine independent check: it validates PECD against
 #   *plant-level* metered truth rather than a national aggregate.
+# - The diffuse hourly scatter is genuine high-frequency noise, not a
+#   timestamp/timezone problem: correlation climbs smoothly and
+#   monotonically from 0.86 (hourly) to
+#   0.96 (monthly) as aggregation removes gust-scale variability that a
+#   single weather-model grid cell was never going to capture for one
+#   specific farm.
