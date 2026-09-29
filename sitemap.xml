@@ -37,4 +37,7 @@
   <url>
     <loc>http://localhost:3000/notebooks/kelmarsh-vs-pecd</loc>
   </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/kelmarsh-windspeed-reconstruction</loc>
+  </url>
 </urlset>
