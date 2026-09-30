@@ -178,17 +178,20 @@ def page_pecd_country_comparison(context: AssetExecutionContext) -> None:
 
 @asset(
     name="page_re_buildout_battery_residual_load",
-    deps=["pecd_country_capacity_factors_simple", "smard_load", "mastr_capacity_by_region_year"],
+    deps=["pecd_country_capacity_factors_simple_de", "smard_load", "mastr_capacity_by_region_year"],
     group_name="pages",
     kinds={"notebook"},
     tags=_PAGE_TAGS,
     description=(
-        "Physical (not cost-optimised) sweep of RE buildout multiplier x aggregate battery duration against "
-        "SMARD's real hourly demand: average RE+battery share of demand, curtailment, peak residual load, and "
-        "worst multi-day shortfall per scenario. Narrower cousin of world-of-energy's "
+        "Physical (not cost-optimised) sweep of RE buildout multiplier x aggregate battery duration against a "
+        "constant demand reference (mean of 2025's daily peak SMARD loads) over PECD's full 1980-2025 weather "
+        "record: average capacity factors, buildout-alone decomposition, battery decomposition at 2x, average "
+        "RE+battery share of demand and curtailment (plus a residual-load heatmap over the 1x-5x/0-4h range), "
+        "and storage's marginal value across the buildout range. Narrower cousin of world-of-energy's "
         "54_germany_energy_battery_mix_costs -- no LCOE/LP optimisation, just this hub's simple DE capacity "
-        "factors -- built to separate 'how much of average demand gets covered' from 'does the Dunkelflaute "
-        "tail go away' (it doesn't, even at unrealistic buildout + battery sizes)."
+        "factors. Replaced 2026-09-30 (previously ran against SMARD's real hourly demand over its ~7-year "
+        "reliable window instead -- see energy-research's 05_pecd_de_capacity_factors_vs_constant_demand for "
+        "that version and the peak-residual-load / worst-multi-day-shortfall analysis this page dropped)."
     ),
 )
 def page_re_buildout_battery_residual_load(context: AssetExecutionContext) -> None:

@@ -44,9 +44,10 @@ reviewed against the new numbers.
   (offshore mapped per individual zone, not collapsed to one country color).
 - **RE buildout + battery storage vs. residual load** — a physical (not
   cost-optimised) sweep of RE buildout multiplier x battery duration against
-  real hourly demand: how much of demand gets covered on average, how much
-  gets curtailed, and whether either lever actually closes the Dunkelflaute
-  tail (it doesn't).
+  a constant demand reference over PECD's full 1980-2025 weather record: how
+  much of demand gets covered on average, how much gets curtailed, and a
+  residual-load heatmap showing buildout dominates over battery size in the
+  near-term (1x-5x, 0-4h) range.
 - **Solar capture rate** — checks whether PV's day-ahead capture rate has
   really fallen over time as the cannibalization hypothesis predicts: it has,
   roughly halving since 2019, and tracks installed PV capacity (r = -0.88)
