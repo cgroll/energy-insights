@@ -262,6 +262,27 @@ def page_kelmarsh_vs_pecd(context: AssetExecutionContext) -> None:
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
+@asset(
+    name="page_negative_day_ahead_prices",
+    deps=["smard_price_de_lu"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "How negative EPEX day-ahead prices (DE-LU) are evolving: hours-per-year level and trend (full years "
+        "only), hour-of-day/month-of-year seasonality pooled across years, a year x month heatmap showing the "
+        "seasonal pattern both deepening and widening over time, and the distribution of consecutive-hour "
+        "negative-price episode lengths (episode count vs. share of total negative hours). Prototyped in "
+        "energy-research's exploratory pipeline (11_negative_day_ahead_prices, cross-checked there against "
+        "Bundesnetzagentur/press-reported hours-per-year figures) before being rebuilt here against this "
+        "hub's own smard_price_de_lu asset."
+    ),
+)
+def page_negative_day_ahead_prices(context: AssetExecutionContext) -> None:
+    output_file = _run_page("13_negative_day_ahead_prices.py", "13_negative_day_ahead_prices.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
 page_assets = [
     page_mastr_capacity_de,
     page_mastr_vs_smard_capacity,
@@ -274,4 +295,5 @@ page_assets = [
     page_pv_capture_rate,
     page_price_bimodality,
     page_kelmarsh_vs_pecd,
+    page_negative_day_ahead_prices,
 ]

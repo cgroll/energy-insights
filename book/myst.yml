@@ -39,6 +39,9 @@ project:
     - title: PECD vs. real plant-level generation (Kelmarsh, UK)
       children:
         - file: notebooks/12_kelmarsh_vs_pecd.ipynb
+    - title: Negative day-ahead prices
+      children:
+        - file: notebooks/13_negative_day_ahead_prices.ipynb
 site:
   options:
     folders: true

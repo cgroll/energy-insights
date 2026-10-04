@@ -58,6 +58,11 @@ reviewed against the new numbers.
   shape by season and year: summer goes from one shallow midday hump to a
   deep two-peaked valley, winter stays one-humped throughout — the shape
   change tracks PV output, not the calendar.
+- **Negative day-ahead prices** — how negative EPEX day-ahead prices are
+  evolving: hours-per-year level and trend, hour-of-day/month-of-year
+  seasonality, a year x month heatmap showing the seasonal pattern both
+  deepening and widening over time, and how negative-price episodes
+  typically last several hours in a row rather than a single isolated hour.
 
 ## Roadmap
 
