@@ -296,10 +296,10 @@ def page_negative_day_ahead_prices(context: AssetExecutionContext) -> None:
         "activation price, Module 2 is ID-AEP +/- a saturating minimum distance, Module 3 is a scarcity "
         "penalty active only above 80% of dimensioned reserve capacity. Reconstructs real reBAP to a near-"
         "exact match and breaks down which module actually sets the price, by share of quarter-hours (Module "
-        "1 most of the time, Module 3 genuinely rare). Prototyped in energy-research's exploratory pipeline "
-        "(19_download_aep_modules, 20_rebap_exact_reconstruction) -- including finding and fixing a raw-data "
-        "quirk where Module 3's 'doesn't apply' case is encoded as a literal 0.0 instead of a placeholder "
-        "99.93% of the time, already corrected upstream in edh/aep_modules.py -- before being rebuilt here."
+        "1 most of the time, Module 3 genuinely rare). Prototyped in energy-research's exploratory pipeline -- "
+        "including finding and fixing a raw-data quirk where Module 3's 'doesn't apply' case is encoded as a "
+        "literal 0.0 instead of a placeholder 99.93% of the time, already corrected upstream in "
+        "edh/aep_modules.py -- before being rebuilt here."
     ),
 )
 def page_rebap_formula_reconstruction(context: AssetExecutionContext) -> None:

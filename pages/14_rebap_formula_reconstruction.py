@@ -35,10 +35,9 @@
 # does `max`/`min` of the three published modules actually reproduce
 # published reBAP?
 #
-# Prototyped in `energy-research`'s exploratory pipeline
-# (`19_download_aep_modules.py`, `20_rebap_exact_reconstruction.py`) before
-# being rebuilt here against this hub's own `rebap_price`/`nrv_saldo`/
-# `id_aep`/`aep_modules` assets.
+# Prototyped in `energy-research`'s exploratory pipeline before being
+# rebuilt here against this hub's own `rebap_price`/`nrv_saldo`/`id_aep`/
+# `aep_modules` assets.
 
 # %%
 import numpy as np
