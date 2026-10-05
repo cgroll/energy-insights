@@ -307,6 +307,28 @@ def page_rebap_formula_reconstruction(context: AssetExecutionContext) -> None:
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
+@asset(
+    name="page_rebap_intraday_signal",
+    deps=["rebap_price", "nrv_saldo", "id_aep", "smard_price_de_lu"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "Tests whether reBAP - ID-AEP (intraday price) is a tighter real-time imbalance signal than reBAP - "
+        "day-ahead, the more obvious comparison. Result: same-sign agreement against NRV-Saldo rises from ~93% "
+        "to a clean 100% when switching the reference price to ID-AEP, but Pearson r barely moves -- both "
+        "effects trace back to reBAP's own published formula (page_rebap_formula_reconstruction's Module 2 is "
+        "built as ID-AEP +/- a distance whose sign is the balance's own sign, by construction, but whose "
+        "magnitude saturates at a small capped value). Includes a one-week time-series view showing the spread "
+        "visibly tracking the imbalance volume swing for swing. Prototyped in energy-research's exploratory "
+        "pipeline before being rebuilt here against this hub's own assets."
+    ),
+)
+def page_rebap_intraday_signal(context: AssetExecutionContext) -> None:
+    output_file = _run_page("15_rebap_intraday_signal.py", "15_rebap_intraday_signal.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
 page_assets = [
     page_mastr_capacity_de,
     page_mastr_vs_smard_capacity,
@@ -321,4 +343,5 @@ page_assets = [
     page_kelmarsh_vs_pecd,
     page_negative_day_ahead_prices,
     page_rebap_formula_reconstruction,
+    page_rebap_intraday_signal,
 ]

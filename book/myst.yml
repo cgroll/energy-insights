@@ -45,6 +45,7 @@ project:
     - title: reBAP formula reconstruction
       children:
         - file: notebooks/14_rebap_formula_reconstruction.ipynb
+        - file: notebooks/15_rebap_intraday_signal.ipynb
 site:
   options:
     folders: true
