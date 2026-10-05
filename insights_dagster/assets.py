@@ -283,6 +283,30 @@ def page_negative_day_ahead_prices(context: AssetExecutionContext) -> None:
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
+@asset(
+    name="page_rebap_formula_reconstruction",
+    deps=["rebap_price", "nrv_saldo", "id_aep", "aep_modules"],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "reBAP's own published calculation formula -- max(Module 1, Module 2, Module 3) when the system was "
+        "short that quarter-hour, min(...) when long -- tested directly against real reBAP using the hub's "
+        "own nrv_saldo/id_aep/aep_modules assets. Module 1 is the real PICASSO/MARI balancing-energy "
+        "activation price, Module 2 is ID-AEP +/- a saturating minimum distance, Module 3 is a scarcity "
+        "penalty active only above 80% of dimensioned reserve capacity. Reconstructs real reBAP to a near-"
+        "exact match and breaks down which module actually sets the price, by share of quarter-hours (Module "
+        "1 most of the time, Module 3 genuinely rare). Prototyped in energy-research's exploratory pipeline "
+        "(19_download_aep_modules, 20_rebap_exact_reconstruction) -- including finding and fixing a raw-data "
+        "quirk where Module 3's 'doesn't apply' case is encoded as a literal 0.0 instead of a placeholder "
+        "99.93% of the time, already corrected upstream in edh/aep_modules.py -- before being rebuilt here."
+    ),
+)
+def page_rebap_formula_reconstruction(context: AssetExecutionContext) -> None:
+    output_file = _run_page("14_rebap_formula_reconstruction.py", "14_rebap_formula_reconstruction.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
 page_assets = [
     page_mastr_capacity_de,
     page_mastr_vs_smard_capacity,
@@ -296,4 +320,5 @@ page_assets = [
     page_price_bimodality,
     page_kelmarsh_vs_pecd,
     page_negative_day_ahead_prices,
+    page_rebap_formula_reconstruction,
 ]

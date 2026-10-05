@@ -42,6 +42,9 @@ project:
     - title: Negative day-ahead prices
       children:
         - file: notebooks/13_negative_day_ahead_prices.ipynb
+    - title: reBAP formula reconstruction
+      children:
+        - file: notebooks/14_rebap_formula_reconstruction.ipynb
 site:
   options:
     folders: true
