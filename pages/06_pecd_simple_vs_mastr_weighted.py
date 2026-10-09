@@ -9,15 +9,28 @@
 # ---
 
 # %% [markdown]
-# # DE capacity factors: simple approximation vs. MaStR-weighted
+# # DE capacity factors: three ways to weight PECD, compared
 #
 # `de_capacity_factor_current_fleet` (this hub's primary DE capacity-factor
 # product) weights PECD's zone/technology-level capacity factors by MaStR's
 # real, unit-level installed-capacity data -- accurate, but it only works
 # where a MaStR-equivalent registry exists, i.e. Germany. This page asks: how
-# far do we get with a *much* simpler approximation that needs no per-unit
-# fleet data at all -- just PECD's own capacity factors plus a couple of
-# publicly known, fixed weights?
+# far do we get with much simpler approximations that need no per-unit fleet
+# data, or only a nationwide (not per-unit) slice of it?
+#
+# **Three variants compared, 2026-10-09:**
+# 1. **`simple`** -- no MaStR at all (solar: fixed, hand-sourced external
+#    market weights; wind: pure PECD zone-area geometry).
+# 2. **`mastr_weighted` (new)** -- same wind geometry as `simple`, but
+#    solar's technology mix now comes from real MaStR unit data (today's
+#    actual installed-capacity split across the 4 technologies), not an
+#    externally-sourced number. Built 2026-10-09 as
+#    `de_capacity_factors_fleet_weighted` (`edh/pecd.py`), itself built on
+#    top of the now-separate `de_technology_capacity_factors` (no MaStR) +
+#    `de_fleet_weights_snapshot` (MaStR, timestamped) assets.
+# 3. **`complex`** (`de_capacity_factor_current_fleet`) -- full per-unit MaStR
+#    weighting at NUTS2 (solar) / zone-fraction (wind) resolution, the real
+#    product.
 #
 # **This page's own prototype became a real hub asset.** The fixed-weight
 # approximation below is no longer computed here -- it's read straight from
@@ -73,8 +86,28 @@ import pandas as pd
 
 from insights.paths import hub_file
 
-COMPLEX_COLOR = "#2a78d6"  # de_capacity_factor_current_fleet -- MaStR-weighted, this hub's real product
+COMPLEX_COLOR = "#2a78d6"  # de_capacity_factor_current_fleet -- full MaStR weighting, this hub's real product
 SIMPLE_COLOR = "#eb6834"  # pecd_country_capacity_factors_simple -- no MaStR involved
+MASTR_WEIGHTED_COLOR = "#2a9d6b"  # de_capacity_factors_fleet_weighted -- nationwide MaStR solar mix, no NUTS2/zone detail
+
+# %% [markdown]
+# ## The real MaStR solar technology mix, today
+#
+# What `mastr_weighted` actually uses instead of the hand-sourced external
+# weights above -- read straight from `de_fleet_weights_snapshot`, not
+# recomputed here.
+
+# %%
+fleet_weights = pd.read_parquet(hub_file("pecd", "de_fleet_weights_snapshot.parquet")).iloc[0]
+weight_comparison = pd.DataFrame({
+    "external (simple)": {"60": 0.28, "61": 0.39, "62": 0.31, "63": 0.02},
+    "MaStR, today (mastr_weighted)": {
+        "60": fleet_weights["solar_weight_60"], "61": fleet_weights["solar_weight_61"],
+        "62": fleet_weights["solar_weight_62"], "63": fleet_weights["solar_weight_63"],
+    },
+})
+print(f"MaStR fleet snapshot as of {fleet_weights['as_of'].date()}:")
+print(weight_comparison.round(3))
 
 # %% [markdown]
 # ## DE columns from `pecd_country_capacity_factors_simple`
@@ -95,41 +128,62 @@ offshore_simple = de_simple["wind_offshore"].rename("simple")
 # aggregates the charts further down use for readability. Aggregating to
 # monthly (or coarser) smooths out a lot of hour-to-hour noise, so a
 # correlation/MAE computed on monthly means alone would overstate how well
-# the simple approximation tracks the real thing *within* a month -- shown
+# the simpler approximations track the real thing *within* a month -- shown
 # explicitly in the resolution-comparison table right after.
 
 # %%
 complex_cf = pd.read_parquet(hub_file("pecd", "de_capacity_factor_current_fleet.parquet"))
+mastr_weighted_cf = pd.read_parquet(hub_file("pecd", "de_capacity_factors_fleet_weighted.parquet"))
 
 SERIES = {
-    "solar": (solar_simple, complex_cf["capacity_factor_solar"]),
-    "wind_onshore": (onshore_simple, complex_cf["capacity_factor_wind_onshore"]),
-    "wind_offshore": (offshore_simple, complex_cf["capacity_factor_wind_offshore"]),
+    "solar": {
+        "simple": solar_simple,
+        "mastr_weighted": mastr_weighted_cf["capacity_factor_solar"],
+        "complex": complex_cf["capacity_factor_solar"],
+    },
+    "wind_onshore": {
+        "simple": onshore_simple,
+        "mastr_weighted": mastr_weighted_cf["capacity_factor_wind_onshore"],
+        "complex": complex_cf["capacity_factor_wind_onshore"],
+    },
+    "wind_offshore": {
+        "simple": offshore_simple,
+        "mastr_weighted": mastr_weighted_cf["capacity_factor_wind_offshore"],
+        "complex": complex_cf["capacity_factor_wind_offshore"],
+    },
 }
+VARIANTS = ("simple", "mastr_weighted")  # each compared against "complex"
 
 
-def error_stats(simple: pd.Series, complex_: pd.Series, resample: str | None = None) -> dict:
-    """Deviation metrics between the two series. `resample=None` keeps the
-    native hourly resolution; e.g. `resample="D"` or `"MS"` averages both
-    series to that frequency first -- so the same function makes the
-    resolution-sensitivity comparison below an apples-to-apples one-liner."""
-    df = pd.concat([simple.rename("simple"), complex_.rename("complex")], axis=1, sort=False).dropna()
+def error_stats(variant: pd.Series, complex_: pd.Series, resample: str | None = None) -> dict:
+    """Deviation metrics between one approximation and `complex` (the real,
+    full MaStR-weighted product). `resample=None` keeps the native hourly
+    resolution; e.g. `resample="D"` or `"MS"` averages both series to that
+    frequency first -- so the same function makes the resolution-sensitivity
+    comparison below an apples-to-apples one-liner."""
+    df = pd.concat([variant.rename("variant"), complex_.rename("complex")], axis=1, sort=False).dropna()
     if resample is not None:
         df = df.resample(resample).mean()
-    err = df["simple"] - df["complex"]
+    err = df["variant"] - df["complex"]
     return {
         "n_obs": len(df),
-        "mean_simple": df["simple"].mean(),
+        "mean_variant": df["variant"].mean(),
         "mean_complex": df["complex"].mean(),
-        "corr": df["simple"].corr(df["complex"]),
+        "corr": df["variant"].corr(df["complex"]),
         "bias_pp": err.mean() * 100,
         "mae_pp": err.abs().mean() * 100,
         "rmse_pp": (err**2).mean() ** 0.5 * 100,
     }
 
 
-stats = pd.DataFrame({tech: error_stats(simple, complex_) for tech, (simple, complex_) in SERIES.items()}).T
-print("Hourly deviation metrics (native resolution):")
+stats = pd.concat(
+    {
+        variant: pd.DataFrame({tech: error_stats(series[variant], series["complex"]) for tech, series in SERIES.items()}).T
+        for variant in VARIANTS
+    },
+    axis=0,
+)
+print("Hourly deviation metrics (native resolution), each variant vs. complex:")
 print(stats.round(4))
 
 # %% [markdown]
@@ -139,8 +193,16 @@ print(stats.round(4))
 resolutions = {"hourly": None, "daily": "D", "monthly": "MS"}
 by_resolution = pd.concat(
     {
-        tech: pd.DataFrame({label: error_stats(simple, complex_, resample=freq) for label, freq in resolutions.items()}).T
-        for tech, (simple, complex_) in SERIES.items()
+        variant: pd.concat(
+            {
+                tech: pd.DataFrame(
+                    {label: error_stats(series[variant], series["complex"], resample=freq) for label, freq in resolutions.items()}
+                ).T
+                for tech, series in SERIES.items()
+            },
+            axis=0,
+        )
+        for variant in VARIANTS
     },
     axis=0,
 )
@@ -151,15 +213,18 @@ print(by_resolution[["n_obs", "corr", "mae_pp", "rmse_pp"]].round(4))
 
 # %%
 fig, axes = plt.subplots(3, 1, figsize=(13, 11), sharex=True)
-for ax, (tech, (simple, complex_)) in zip(axes, SERIES.items()):
-    df = pd.concat([simple.rename("simple"), complex_.rename("complex")], axis=1, sort=False).dropna()
+for ax, (tech, series) in zip(axes, SERIES.items()):
+    df = pd.concat(
+        {variant: series[variant] for variant in VARIANTS} | {"complex": series["complex"]}, axis=1
+    ).dropna()
     monthly = df.resample("MS").mean()
-    ax.plot(monthly.index, monthly["complex"], label="MaStR-weighted (de_capacity_factor_current_fleet)", color=COMPLEX_COLOR, linewidth=1.3)
-    ax.plot(monthly.index, monthly["simple"], label="Simple (fixed weights, no MaStR)", color=SIMPLE_COLOR, linewidth=1.3, linestyle="--")
+    ax.plot(monthly.index, monthly["complex"], label="Complex (de_capacity_factor_current_fleet)", color=COMPLEX_COLOR, linewidth=1.3)
+    ax.plot(monthly.index, monthly["simple"], label="Simple (external weights, no MaStR)", color=SIMPLE_COLOR, linewidth=1.3, linestyle="--")
+    ax.plot(monthly.index, monthly["mastr_weighted"], label="MaStR-weighted (nationwide mix, no NUTS2/zone detail)", color=MASTR_WEIGHTED_COLOR, linewidth=1.3, linestyle=":")
     ax.set_ylabel("Capacity factor")
     ax.set_title(tech)
     ax.legend(loc="upper left", fontsize=8)
-fig.suptitle("DE capacity factor, monthly mean: simple vs. MaStR-weighted")
+fig.suptitle("DE capacity factor, monthly mean: three variants")
 fig.tight_layout()
 plt.show()
 
@@ -168,13 +233,16 @@ plt.show()
 
 # %%
 fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
-for ax, (tech, (simple, complex_)) in zip(axes, SERIES.items()):
-    df = pd.concat([simple.rename("simple"), complex_.rename("complex")], axis=1, sort=False).dropna()
+for ax, (tech, series) in zip(axes, SERIES.items()):
+    df = pd.concat(
+        {variant: series[variant] for variant in VARIANTS} | {"complex": series["complex"]}, axis=1
+    ).dropna()
     annual = df.groupby(df.index.year).mean()
     x = np.arange(len(annual))
-    width = 0.38
-    ax.bar(x - width / 2, annual["complex"], width, label="MaStR-weighted", color=COMPLEX_COLOR)
-    ax.bar(x + width / 2, annual["simple"], width, label="Simple", color=SIMPLE_COLOR)
+    width = 0.26
+    ax.bar(x - width, annual["complex"], width, label="Complex", color=COMPLEX_COLOR)
+    ax.bar(x, annual["simple"], width, label="Simple", color=SIMPLE_COLOR)
+    ax.bar(x + width, annual["mastr_weighted"], width, label="MaStR-weighted", color=MASTR_WEIGHTED_COLOR)
     ax.set_xticks(x)
     ax.set_xticklabels(annual.index, rotation=45)
     ax.set_ylabel("Capacity factor")
@@ -186,44 +254,52 @@ plt.show()
 # %% [markdown]
 # ## Takeaways
 #
-# - **Solar matches almost perfectly**: correlation ~0.999, bias well under
-#   half a percentage point. A fixed, publicly sourced rooftop/ground and
-#   fixed/tracking mix captures essentially all of what MaStR's real
-#   installed-capacity mix would add -- the extra precision from unit-level
-#   data barely moves the national aggregate.
-# - **Wind onshore is decent but not much better than doing nothing clever**:
-#   correlation ~0.975, bias ~+0.3 percentage points -- close to, not
-#   meaningfully better than, a plain unweighted mean across zones would be.
-#   Germany's 7 PEON zones don't differ enough in area for area-weighting to
-#   add much over equal weighting.
-# - **Wind offshore matches well, even on the coarser scheme the hub asset
-#   actually uses**: correlation ~0.986, bias ~+1.3 percentage points. Note
-#   this page originally prototyped offshore as an *area-weighted* mean of
-#   `peof` zones (renormalized over whichever zones PECD actually modeled,
-#   after catching a ~20% relative-bias bug from pandas silently dropping the
-#   3 unmodeled PEOF zones' weight without redistributing it) -- but
-#   `pecd_country_capacity_factors_simple` uses a plain *unweighted* mean of
-#   the coarser `p2of` scheme instead, since `p2of`'s zone codes don't match
-#   the existing `peof` mask (see `edh/pecd.py` module comment). The two
-#   schemes score close enough (~0.977 area-weighted `peof` vs. ~0.986
-#   unweighted `p2of`, in this DE-only comparison) that the switch was worth
-#   it for full-Europe compatibility.
-# - **Net**: for a first-cut, MaStR-free capacity factor, fixed technology-mix
-#   weights (solar) and area-weighted, NaN-aware zone means (wind) already get
-#   remarkably close to the fully fleet-weighted version for Germany, the one
-#   country where a true comparison is possible -- which is why
-#   `pecd_country_capacity_factors_simple` now runs the same methodology for
-#   every PECD country. **Caveat that doesn't show up in this page's numbers:**
-#   wind's per-country weights are real geometry and generalize cleanly, but
-#   solar's technology-mix weights are still Germany's, reused for every other
-#   country with no validation -- this page can only confirm the approach
-#   works well *for Germany*, not that it works well everywhere it now runs.
-# - **Resolution matters a lot for how good this looks**: the same
-#   comparison at monthly-mean resolution flatters both wind series --
-#   correlation climbs from ~0.975/0.986 (hourly) to ~0.994/0.997 (monthly),
-#   and MAE drops roughly 3x (e.g. wind offshore: 3.8 percentage points
-#   hourly vs. 1.4 monthly). Averaging a whole month together cancels out a
-#   lot of hour-to-hour disagreement that's real at the resolution most uses
-#   (e.g. Dunkelflaute analysis) actually care about -- the hourly numbers in
-#   the headline table above, not the monthly chart further up, are the
-#   honest measure of how well the simple approximation tracks reality.
+# - **Solar: `mastr_weighted` does not beat `simple`, surprisingly.**
+#   `simple`'s external, hand-sourced weights score corr 0.9993 / MAE 0.302pp
+#   against `complex`; swapping in `mastr_weighted`'s real, today-dated MaStR
+#   technology mix (60/61/62/63 = 33.0/32.6/34.0/0.4%, vs. the external
+#   28/39/31/2%) actually scores very slightly *worse* (corr 0.9993 / MAE
+#   0.309pp). Reason: both `simple` and `mastr_weighted` apply **one single
+#   nationwide** technology-mix percentage, while `complex` varies the mix by
+#   NUTS2 region -- real regional differences in rooftop-vs-utility share
+#   aren't captured by a nationwide number either way, so getting that one
+#   number right from real data (`mastr_weighted`) vs. a reasonable published
+#   estimate (`simple`) barely matters next to the missing regional detail.
+# - **Wind onshore: `mastr_weighted` is numerically identical to `simple`.**
+#   Both use the exact same PECD PEON zone-area geometry -- MaStR plays no
+#   role in either one's wind weighting, by design (see module docstring).
+#   Corr 0.975, MAE 3.16pp either way, unchanged from before.
+# - **Wind offshore: `mastr_weighted` is a genuine methodology upgrade that
+#   nonetheless scores slightly worse.** `mastr_weighted` is the first variant
+#   to actually *area-weight* the coarser `p2of` zones (a `p2of` mask was
+#   downloaded 2026-10-08, specifically to enable this), where `simple` still
+#   falls back to an unweighted `p2of` mean for lack of that mask. Despite
+#   being the more principled calculation, it scores corr 0.981 / MAE 4.33pp
+#   vs. `simple`'s corr 0.986 / MAE 3.78pp -- a real, if modest, example of
+#   area-weighting *not* helping on this particular zone scheme, consistent
+#   with onshore's own "7 zones don't differ enough in area to matter" finding
+#   below.
+# - **Net: all three variants sit within ~1 correlation point of `complex`
+#   across the board** -- solar 0.999 regardless of weighting choice, wind
+#   0.975-0.986 regardless of whether the nationwide weight is external,
+#   MaStR-derived, or area-weighted vs. not. For everything built on top of
+#   this hub (the long DE climatology, the WeatherNext grid reports, etc.),
+#   `mastr_weighted` is a reasonable one to standardize on precisely because
+#   it's grounded in real MaStR data without needing NUTS2/zone-fraction
+#   detail -- not because it scores measurably better than the alternatives,
+#   it mostly doesn't.
+# - **Resolution matters a lot for how good any of this looks**: the same
+#   comparison at monthly-mean resolution flatters both wind variants --
+#   correlation climbs from ~0.975-0.986 (hourly) to ~0.994-0.996 (monthly),
+#   and MAE drops roughly 3-4x. Averaging a whole month together cancels out
+#   a lot of hour-to-hour disagreement that's real at the resolution most
+#   uses (e.g. Dunkelflaute analysis) actually care about -- the hourly
+#   numbers in the headline table above, not the monthly chart further up,
+#   are the honest measure of how well any approximation tracks reality.
+# - **Caveat that doesn't show up in these numbers:** wind's zone geometry
+#   generalizes cleanly to every PECD country (real area, not a borrowed
+#   default); solar's technology-mix weights -- external *and*
+#   MaStR-derived -- are Germany-specific and only validated here, for
+#   Germany. `pecd_country_capacity_factors_simple` still reuses Germany's
+#   external weights for every other country; nothing about this page's
+#   `mastr_weighted` finding extends that validation elsewhere.
