@@ -25,7 +25,26 @@ dependencies = [
     "cartopy>=0.26.0",
     "windpowerlib>=0.2.2",
     "astral>=3.2",
+    # Pinned exactly to match energy-data-hub's own pin (pvlib 0.16 silently
+    # changed iam.martin_ruiz_diffuse's return type -- see that repo's
+    # pyproject.toml comment). Needed here only because this page imports
+    # edh.forecast_capacity_factors directly (see that dependency's own
+    # comment below for why).
+    "pvlib==0.15.2",
+    # Deliberate, flagged exception to this repo's own "no shared client
+    # package yet" convention (AGENTS.md) -- added 2026-10-10 for
+    # pages/16_weathernext_forecast_vs_pecd.py, which needs the hub's own
+    # conversion-methodology *functions* (bias correction, hub-height
+    # extrapolation, turbine curves, solar chain), not just its already-
+    # materialized parquet outputs: the ERA5-based and PECD-2026 comparison
+    # series this page builds aren't pre-materialized hub assets (yet).
+    # Revisit if/when those become real hub assets -- see that page's own
+    # module docstring.
+    "energy-data-hub",
 ]
+
+[tool.uv.sources]
+energy-data-hub = { path = "../energy-data-hub", editable = true }
 
 [build-system]
 requires = ["hatchling"]

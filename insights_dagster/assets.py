@@ -329,6 +329,73 @@ def page_rebap_intraday_signal(context: AssetExecutionContext) -> None:
     context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
 
 
+@asset(
+    name="page_weathernext_forecast_vs_pecd",
+    deps=[
+        "forecast_capacity_factors_de",
+        "era5_capacity_factors_de",
+        "pecd_wind_onshore_capacity_factors",
+        "pecd_wind_offshore_capacity_factors",
+        "pecd_solar_capacity_factors",
+        "peon_region_mask",
+        "peof_region_mask",
+        "mastr_units_wind",
+        "mastr_units_solar",
+        "mastr_wind_technical_detail",
+        "mastr_solar_technical_detail",
+    ],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "How far does WeatherNext-forecast-based capacity factors (energy-data-hub's own from-scratch "
+        "replication, not PECD's methodology) sit from PECD's own official product, and how much of that "
+        "gap is weather-forecast uncertainty vs. methodology difference: MAE-by-lead-hour against PECD, a "
+        "Full-RE spaghetti plot of forecast trajectories against PECD's climatology band and current-year "
+        "realized series, a lead-hour-1 scatter against both PECD and ERA5 (same hub methodology), and the "
+        "same MAE-by-lead-hour curve against ERA5 to isolate the pure weather-forecast error. Reads only "
+        "materialized hub assets -- PECD self-extends into the current year, ERA5-fed comparison comes from "
+        "era5_capacity_factors_de -- no inline CDS/BigQuery pulls or conversion."
+    ),
+)
+def page_weathernext_forecast_vs_pecd(context: AssetExecutionContext) -> None:
+    output_file = _run_page("16_weathernext_forecast_vs_pecd.py", "16_weathernext_forecast_vs_pecd.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
+@asset(
+    name="page_era5_methodology_vs_pecd",
+    deps=[
+        "era5_capacity_factors_de",
+        "pecd_wind_onshore_capacity_factors",
+        "pecd_wind_offshore_capacity_factors",
+        "pecd_solar_capacity_factors",
+        "peon_region_mask",
+        "peof_region_mask",
+        "mastr_units_wind",
+        "mastr_units_solar",
+        "mastr_wind_technical_detail",
+        "mastr_solar_technical_detail",
+    ],
+    group_name="pages",
+    kinds={"notebook"},
+    tags=_PAGE_TAGS,
+    description=(
+        "Does energy-data-hub's own from-scratch capacity-factor chain (GWA wind-speed bias correction, "
+        "hub-height extrapolation, per-plant turbine curves, PECD-documented solar chain), fed real ERA5 "
+        "reanalysis instead of a forecast, track PECD's own official product -- over the full multi-year "
+        "window both now cover (2018-2025 history plus however much of the current year is published)? "
+        "Monthly-mean time series, hourly-through-monthly correlation/MAE/NMAE/bias (capacity factor and "
+        "MW units), a year x month MAE heatmap for seasonality, and an hourly scatter, one panel per "
+        "technology plus the Full RE blend. PECD-vs-real-SMARD-generation deliberately not included yet -- "
+        "needs the current-fleet-vs-historical-fleet mismatch resolved first, see the page's own intro."
+    ),
+)
+def page_era5_methodology_vs_pecd(context: AssetExecutionContext) -> None:
+    output_file = _run_page("17_era5_methodology_vs_pecd_vs_smard.py", "17_era5_methodology_vs_pecd_vs_smard.ipynb")
+    context.add_output_metadata({"path": MetadataValue.path(str(output_file))})
+
+
 page_assets = [
     page_mastr_capacity_de,
     page_mastr_vs_smard_capacity,
@@ -344,4 +411,6 @@ page_assets = [
     page_negative_day_ahead_prices,
     page_rebap_formula_reconstruction,
     page_rebap_intraday_signal,
+    page_weathernext_forecast_vs_pecd,
+    page_era5_methodology_vs_pecd,
 ]

@@ -46,6 +46,12 @@ project:
       children:
         - file: notebooks/14_rebap_formula_reconstruction.ipynb
         - file: notebooks/15_rebap_intraday_signal.ipynb
+    - title: WeatherNext forecast vs. PECD/ERA5
+      children:
+        - file: notebooks/16_weathernext_forecast_vs_pecd.ipynb
+    - title: Own methodology (ERA5-fed) vs. PECD
+      children:
+        - file: notebooks/17_era5_methodology_vs_pecd_vs_smard.ipynb
 site:
   options:
     folders: true
