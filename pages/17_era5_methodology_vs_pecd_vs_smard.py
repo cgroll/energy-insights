@@ -297,3 +297,42 @@ fig.supxlabel("PECD capacity factor", color=TEXT_SECONDARY, fontsize=10.5)
 fig.supylabel("Own methodology capacity factor", color=TEXT_SECONDARY, fontsize=10.5)
 fig.tight_layout(rect=[0.02, 0.02, 1, 0.95])
 plt.show()
+
+# %% [markdown]
+# ## How much does aggregation level change the apparent fit?
+#
+# The same capacity-factor correlation and MAE from the metrics table
+# above (not the MW ones -- CF keeps the four technologies on one
+# comparable 0-1 scale), now plotted against each aggregation level's
+# actual period length. Log x-axis, since hourly through monthly spans
+# almost three orders of magnitude. Correlation and MAE as two separate
+# charts, not a dual-axis plot -- they're different-scale measures.
+
+# %%
+AGG_HOURS = {"Hourly": 1, "2-hourly": 2, "Daily": 24, "Weekly": 168, "Monthly": 730}
+TECH_COLORS = {"pv": "#1baf7a", "wind_onshore": "#2a78d6", "wind_offshore": "#eb6834", "full_re": "#4a3aa7"}
+
+cf_metrics = metrics.xs("capacity factor", level="unit").reset_index()
+cf_metrics["period_hours"] = cf_metrics["aggregation"].map(AGG_HOURS)
+
+fig, axes = plt.subplots(1, 2, figsize=(13, 5.2), dpi=130)
+fig.patch.set_facecolor(SURFACE)
+for ax, (metric_col, metric_label) in zip(axes, [("corr", "Correlation"), ("mae", "MAE (capacity factor)")]):
+    ax.set_facecolor(SURFACE)
+    for tech in TECHS:
+        g = cf_metrics[cf_metrics["technology"] == TECH_LABELS[tech]].sort_values("period_hours")
+        ax.plot(g["period_hours"], g[metric_col], color=TECH_COLORS[tech], marker="o", markersize=5, linewidth=1.8, label=TECH_LABELS[tech])
+    ax.set_xscale("log")
+    ax.set_xticks(list(AGG_HOURS.values()))
+    ax.set_xticklabels(list(AGG_HOURS.keys()), fontsize=8.5)
+    ax.set_xlabel("Aggregation period", color=TEXT_SECONDARY)
+    ax.set_ylabel(metric_label, color=TEXT_SECONDARY)
+    ax.set_title(metric_label, color=TEXT_PRIMARY, fontsize=11.5, loc="left")
+    ax.grid(True, color="#e5e3dc", linewidth=0.7)
+    for spine in ax.spines.values():
+        spine.set_color("#d8d6cd")
+    ax.tick_params(colors=TEXT_SECONDARY, labelsize=8.5)
+axes[0].legend(loc="lower right", frameon=False, fontsize=8.5, labelcolor=TEXT_PRIMARY)
+fig.suptitle("Own methodology vs. PECD: how aggregation level changes the apparent fit", color=TEXT_PRIMARY, fontsize=12.5, x=0.02, ha="left", y=1.02)
+fig.tight_layout()
+plt.show()
