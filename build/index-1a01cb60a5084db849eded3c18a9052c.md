@@ -63,6 +63,26 @@ reviewed against the new numbers.
   seasonality, a year x month heatmap showing the seasonal pattern both
   deepening and widening over time, and how negative-price episodes
   typically last several hours in a row rather than a single isolated hour.
+- **WeatherNext forecast vs. PECD/ERA5** — how far WeatherNext-forecast-based
+  capacity factors (this hub's own from-scratch replication) sit from PECD's
+  own official product, and how much of that gap is weather-forecast
+  uncertainty vs. methodology difference: MAE by lead hour against PECD, a
+  Full-RE spaghetti plot of forecast trajectories against PECD's
+  climatology and current-year realized series, a shortest-lead-hour scatter
+  against both PECD and ERA5, and the same MAE-by-lead-hour curve against
+  ERA5 to isolate the pure weather-forecast error. Reads only materialized
+  hub assets — PECD self-extends into the current year, no inline
+  CDS/BigQuery pulls or conversion.
+- **Own methodology (ERA5-fed) vs. PECD** — does this hub's own from-scratch
+  capacity-factor chain, fed real ERA5 reanalysis instead of a forecast,
+  track PECD's own official product over the full multi-year window both
+  cover (2018-2025 plus however much of the current year is published)?
+  Monthly-mean time series, hourly-through-monthly correlation/MAE/NMAE/bias
+  in both capacity-factor and MW units, a year x month MAE heatmap for
+  seasonality, and an hourly scatter — one panel per technology plus the
+  Full RE blend. PECD-vs-real-SMARD-generation deliberately left for a
+  follow-up (needs the current-fleet-vs-historical-fleet mismatch resolved
+  first).
 
 ## Roadmap
 

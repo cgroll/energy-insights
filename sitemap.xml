@@ -46,4 +46,10 @@
   <url>
     <loc>http://localhost:3000/notebooks/rebap-intraday-signal</loc>
   </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/weathernext-forecast-vs-pecd</loc>
+  </url>
+  <url>
+    <loc>http://localhost:3000/notebooks/era5-methodology-vs-pecd-vs-smard</loc>
+  </url>
 </urlset>
