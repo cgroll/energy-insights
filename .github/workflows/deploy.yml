@@ -19,11 +19,17 @@ jobs:
       # repo's "no shared client package yet" convention) -- `uv sync`
       # needs it checked out at that exact relative location, or package
       # metadata resolution fails before the book build even starts.
+      # actions/checkout refuses a `path` outside the workspace directly
+      # (`../energy-data-hub` errors as "not under" the workspace), so
+      # check out inside the workspace, then relocate.
       - name: Check out energy-data-hub (sibling dependency)
         uses: actions/checkout@v4
         with:
           repository: cgroll/energy-data-hub
-          path: ../energy-data-hub
+          path: energy-data-hub
+
+      - name: Move energy-data-hub to the sibling location pyproject.toml expects
+        run: mv energy-data-hub ../energy-data-hub
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
