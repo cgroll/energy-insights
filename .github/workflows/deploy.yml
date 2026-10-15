@@ -14,6 +14,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # pyproject.toml depends on energy-data-hub as an editable sibling
+      # path (`../energy-data-hub`, see that file's own comment on this
+      # repo's "no shared client package yet" convention) -- `uv sync`
+      # needs it checked out at that exact relative location, or package
+      # metadata resolution fails before the book build even starts.
+      - name: Check out energy-data-hub (sibling dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: cgroll/energy-data-hub
+          path: ../energy-data-hub
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
