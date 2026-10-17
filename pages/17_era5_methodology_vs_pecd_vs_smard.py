@@ -336,3 +336,68 @@ axes[0].legend(loc="lower right", frameon=False, fontsize=8.5, labelcolor=TEXT_P
 fig.suptitle("Own methodology vs. PECD: how aggregation level changes the apparent fit", color=TEXT_PRIMARY, fontsize=12.5, x=0.02, ha="left", y=1.02)
 fig.tight_layout()
 plt.show()
+
+# %% [markdown]
+# ## A known, unresolved solar timing offset against PECD
+#
+# Solar's hourly correlation against PECD (0.95, see the metrics table
+# above) used to be much worse (0.82) before a real interval-labeling
+# bug was found and fixed here (2026-10-15): ERA5/WeatherNext's
+# `surface_solar_radiation_downwards_1hr` labels a value by the hour it
+# *ends at*, independently confirmed against a clear-sky model (see
+# `edh/forecast_capacity_factors.py`'s own changelog comment), while
+# SMARD labels by the hour a value *starts at* ("block-start timestamps",
+# `edh/smard.py`'s own docstring) -- two different, each internally
+# correct, conventions, not a data error. Fixing that (relabeling this
+# chain's own pv output by -1h) raised hourly solar correlation
+# 0.82 -> 0.95.
+#
+# **But that wasn't the whole gap.** A lag sweep between this chain's own
+# pv output and PECD's shows the correlation peak still isn't at lag 0:
+
+# %%
+LAG_HOURS = range(-3, 4)
+lag_corr = {tech: [own_h[tech].shift(lag).corr(pecd_h[tech]) for lag in LAG_HOURS] for tech in ["pv", "full_re"]}
+lag_df = pd.DataFrame(lag_corr, index=list(LAG_HOURS))
+
+fig, ax = plt.subplots(figsize=(9, 5), dpi=130)
+fig.patch.set_facecolor(SURFACE)
+ax.set_facecolor(SURFACE)
+for tech in ["pv", "full_re"]:
+    ax.plot(lag_df.index, lag_df[tech], color=TECH_COLORS[tech], marker="o", markersize=6, linewidth=2.0, label=TECH_LABELS[tech])
+ax.axvline(0, color="#9a9890", linestyle=(0, (4, 3)), linewidth=1.2)
+ax.set_xlabel("Lag applied to own methodology (hours)", color=TEXT_SECONDARY)
+ax.set_ylabel("Correlation vs. PECD", color=TEXT_SECONDARY)
+ax.set_title("Own methodology vs. PECD: correlation by lag -- hourly", color=TEXT_PRIMARY, loc="left")
+ax.set_xticks(list(LAG_HOURS))
+ax.grid(True, color="#e5e3dc", linewidth=0.8)
+for spine in ax.spines.values():
+    spine.set_color("#d8d6cd")
+ax.tick_params(colors=TEXT_SECONDARY)
+ax.legend(loc="lower center", frameon=False, fontsize=9.5, labelcolor=TEXT_PRIMARY)
+fig.tight_layout()
+plt.show()
+
+print(lag_df.round(4))
+
+# %% [markdown]
+# The peak sits at **lag -1h** (correlation ~0.999 for solar, pulling
+# Full RE up too), not lag 0 -- a further, real, measurable improvement
+# available over what's plotted everywhere else on this page.
+#
+# **Deliberately not applied as a fix here.** Diagnosing *where* this
+# second hour belongs went looking at PECD's own existing solar
+# correction (already -1h, calibrated against SMARD, see
+# `edh.pecd.process_solar_capacity_factors`'s docstring) -- re-tested
+# directly against real SMARD generation using the hub's proper
+# time-varying monthly capacity weighting (`de_potential_historic`, not
+# today's fixed fleet blindly applied across a decade). That test gave a
+# **different, smaller, wrong-signed** result (peak at +1h, correlation
+# only 0.925, not the documented 0.982 at lag 0) -- inconsistent with
+# both the existing documentation and with simply extending this page's
+# own -1h finding to PECD's side. Shifting this chain's own output one
+# hour further would mechanically make it match PECD almost exactly, but
+# there's no independent (SMARD-based) confirmation yet that doing so
+# moves it closer to reality rather than just closer to a PECD
+# convention that may itself still be slightly off. Left as a clearly
+# flagged open question rather than a second blind shift.
