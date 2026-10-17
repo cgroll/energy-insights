@@ -357,33 +357,51 @@ plt.show()
 
 # %%
 LAG_HOURS = range(-3, 4)
-lag_corr = {tech: [own_h[tech].shift(lag).corr(pecd_h[tech]) for lag in LAG_HOURS] for tech in ["pv", "full_re"]}
-lag_df = pd.DataFrame(lag_corr, index=list(LAG_HOURS))
 
-fig, ax = plt.subplots(figsize=(9, 5), dpi=130)
+
+def _lag_metrics(tech: str) -> pd.DataFrame:
+    rows = []
+    for lag in LAG_HOURS:
+        joined = pd.DataFrame({"a": own_h[tech].shift(lag), "b": pecd_h[tech]}).dropna()
+        err = joined["a"] - joined["b"]
+        rows.append({"lag": lag, "corr": joined["a"].corr(joined["b"]), "mae": err.abs().mean(), "bias": err.mean()})
+    return pd.DataFrame(rows).set_index("lag")
+
+
+lag_metrics = {tech: _lag_metrics(tech) for tech in ["pv", "full_re"]}
+
+fig, axes = plt.subplots(1, 2, figsize=(13, 5.2), dpi=130)
 fig.patch.set_facecolor(SURFACE)
-ax.set_facecolor(SURFACE)
-for tech in ["pv", "full_re"]:
-    ax.plot(lag_df.index, lag_df[tech], color=TECH_COLORS[tech], marker="o", markersize=6, linewidth=2.0, label=TECH_LABELS[tech])
-ax.axvline(0, color="#9a9890", linestyle=(0, (4, 3)), linewidth=1.2)
-ax.set_xlabel("Lag applied to own methodology (hours)", color=TEXT_SECONDARY)
-ax.set_ylabel("Correlation vs. PECD", color=TEXT_SECONDARY)
-ax.set_title("Own methodology vs. PECD: correlation by lag -- hourly", color=TEXT_PRIMARY, loc="left")
-ax.set_xticks(list(LAG_HOURS))
-ax.grid(True, color="#e5e3dc", linewidth=0.8)
-for spine in ax.spines.values():
-    spine.set_color("#d8d6cd")
-ax.tick_params(colors=TEXT_SECONDARY)
-ax.legend(loc="lower center", frameon=False, fontsize=9.5, labelcolor=TEXT_PRIMARY)
+for ax, (metric_col, metric_label) in zip(axes, [("corr", "Correlation vs. PECD"), ("mae", "MAE vs. PECD (capacity factor)")]):
+    ax.set_facecolor(SURFACE)
+    for tech in ["pv", "full_re"]:
+        ax.plot(lag_metrics[tech].index, lag_metrics[tech][metric_col], color=TECH_COLORS[tech], marker="o", markersize=6, linewidth=2.0, label=TECH_LABELS[tech])
+    ax.axvline(0, color="#9a9890", linestyle=(0, (4, 3)), linewidth=1.2)
+    ax.set_xlabel("Lag applied to own methodology (hours)", color=TEXT_SECONDARY)
+    ax.set_ylabel(metric_label, color=TEXT_SECONDARY)
+    ax.set_title(metric_label, color=TEXT_PRIMARY, fontsize=11.5, loc="left")
+    ax.set_xticks(list(LAG_HOURS))
+    ax.grid(True, color="#e5e3dc", linewidth=0.8)
+    for spine in ax.spines.values():
+        spine.set_color("#d8d6cd")
+    ax.tick_params(colors=TEXT_SECONDARY)
+axes[0].legend(loc="lower center", frameon=False, fontsize=9.5, labelcolor=TEXT_PRIMARY)
+fig.suptitle("Own methodology vs. PECD: correlation and MAE by lag -- hourly", color=TEXT_PRIMARY, fontsize=12.5, x=0.02, ha="left", y=1.02)
 fig.tight_layout()
 plt.show()
 
-print(lag_df.round(4))
+for tech in ["pv", "full_re"]:
+    print(f"--- {TECH_LABELS[tech]} ---")
+    print(lag_metrics[tech].round(4))
 
 # %% [markdown]
-# The peak sits at **lag -1h** (correlation ~0.999 for solar, pulling
-# Full RE up too), not lag 0 -- a further, real, measurable improvement
-# available over what's plotted everywhere else on this page.
+# The peak sits at **lag -1h**, not lag 0, for both correlation and
+# MAE -- not just a correlation artifact. Solar's MAE roughly halves
+# (0.038 -> 0.019), correlation goes 0.95 -> 0.999; Full RE improves too,
+# diluted by wind (which isn't shifted). Bias stays exactly flat across
+# every lag (0.019 for solar, 0.036 for Full RE) -- shifting only changes
+# *when* the two series are compared, not the average gap between them,
+# exactly as expected.
 #
 # **Deliberately not applied as a fix here.** Diagnosing *where* this
 # second hour belongs went looking at PECD's own existing solar
